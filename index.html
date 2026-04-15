@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>摩天轮乐园</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="page-shell">
+    <header class="topbar">
+      <div class="brand-block">
+        <p class="brand-kicker">Logic Park</p>
+        <h1>摩天轮乐园</h1>
+      </div>
+      <nav class="topnav" aria-label="主导航">
+        <button class="nav-chip is-active" data-nav="home">首页</button>
+        <button class="nav-chip" data-nav="map">乐园地图</button>
+        <button class="nav-chip" data-nav="progress">成长记录</button>
+      </nav>
+    </header>
+
+    <main>
+      <section class="screen is-active" id="screen-home" aria-labelledby="home-title">
+        <div class="hero-card">
+          <div class="hero-copy">
+            <p class="eyebrow">儿童逻辑启蒙小游戏</p>
+            <h2 id="home-title">跟着小动物坐摩天轮，学会顺序观察和位置推理。</h2>
+            <p class="hero-text">
+              看一看谁转到了哪里，想一想谁和谁一样高，再帮排队的小动物找到正确的位置。
+              每一关都能一步一步观察，还会把思路讲给小朋友听。
+            </p>
+            <div class="hero-actions">
+              <button class="primary-button" id="start-journey-button">开始闯关</button>
+              <button class="secondary-button" id="home-progress-button">看看我的进步</button>
+            </div>
+            <div class="hero-pill-row">
+              <span class="hero-pill">电脑网页直接打开</span>
+              <span class="hero-pill">12 类题型 / 60 道题</span>
+              <span class="hero-pill">支持分步讲解</span>
+            </div>
+          </div>
+
+          <aside class="poster-panel">
+            <div class="poster-frame">
+              <img src="pic.png" alt="摩天轮题目插图">
+            </div>
+            <div class="poster-note">
+              <strong>乐园主题：</strong>
+              摩天轮、排队、同高、转几格
+            </div>
+          </aside>
+        </div>
+
+        <div class="feature-grid">
+          <article class="feature-card feature-card-sun">
+            <h3>先看一看</h3>
+            <p>点一下就能转一格，先观察，再作答。</p>
+          </article>
+          <article class="feature-card feature-card-berry">
+            <h3>再想一想</h3>
+            <p>每道题都用短句提示，让孩子知道先找谁、再看谁。</p>
+          </article>
+          <article class="feature-card feature-card-leaf">
+            <h3>最后讲一讲</h3>
+            <p>答错也没关系，系统会把推理过程回放出来。</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="screen" id="screen-map" aria-labelledby="map-title">
+        <div class="section-header">
+          <div>
+            <p class="eyebrow">主题乐园地图</p>
+            <h2 id="map-title">从观察到推理，按顺序解锁每个小区域。</h2>
+          </div>
+          <div class="summary-strip" id="map-summary"></div>
+        </div>
+        <div class="zone-list" id="zone-list"></div>
+      </section>
+
+      <section class="screen" id="screen-game" aria-labelledby="game-title">
+        <div class="game-topbar">
+          <button class="ghost-button" id="back-to-map-button">返回地图</button>
+          <div class="game-meta">
+            <p class="eyebrow" id="game-zone-label">摩天轮乐园</p>
+            <h2 id="game-title">第 1 关</h2>
+          </div>
+          <div class="badge-pill" id="game-level-badge">1 / 12</div>
+        </div>
+
+        <div class="game-layout">
+          <section class="scene-panel">
+            <div class="coach-panel">
+              <span class="badge-pill" id="coach-status">观察中</span>
+              <p id="coach-bubble">先看看摩天轮上的小动物都坐在哪里。</p>
+            </div>
+
+            <div class="scene-card">
+              <div class="scene-sky"></div>
+              <div class="scene-main-layout">
+                <div class="scene-board">
+                  <div class="wheel-stage">
+                    <div class="wheel-base"></div>
+                    <div class="wheel-body" id="wheel-body">
+                      <div class="wheel-ring"></div>
+                      <div class="wheel-spokes" id="wheel-spokes"></div>
+                      <div class="wheel-hub"></div>
+                      <div class="cabin-layer" id="cabin-layer"></div>
+                    </div>
+                    <div class="scene-arrow">顺时针</div>
+                  </div>
+                </div>
+                <aside class="queue-side-panel">
+                  <div class="queue-card">
+                    <div class="queue-header">
+                      <h3>排队区</h3>
+                      <span id="queue-tip">等候中的小动物</span>
+                    </div>
+                    <div class="queue-line" id="queue-line"></div>
+                  </div>
+                </aside>
+              </div>
+
+              <div class="scene-controls">
+                <div class="wheel-control-panel" aria-label="摩天轮控制菜单">
+                  <label class="control-field">
+                    <span>转动方向</span>
+                    <select class="control-select" id="rotate-direction">
+                      <option value="clockwise">顺时针</option>
+                      <option value="counterclockwise">逆时针</option>
+                    </select>
+                  </label>
+                  <label class="control-field">
+                    <span>转动速度</span>
+                    <select class="control-select" id="rotate-speed">
+                      <option value="900">慢慢转</option>
+                      <option value="520" selected>普通速度</option>
+                      <option value="280">快速转</option>
+                    </select>
+                  </label>
+                  <label class="control-field">
+                    <span>转动圈数</span>
+                    <select class="control-select" id="rotate-circles">
+                      <option value="0" selected>0 圈</option>
+                      <option value="1">1 圈</option>
+                      <option value="2">2 圈</option>
+                      <option value="3">3 圈</option>
+                      <option value="4">4 圈</option>
+                      <option value="5">5 圈</option>
+                      <option value="6">6 圈</option>
+                      <option value="7">7 圈</option>
+                      <option value="8">8 圈</option>
+                      <option value="9">9 圈</option>
+                    </select>
+                  </label>
+                  <label class="control-field">
+                    <span>转动格数</span>
+                    <select class="control-select" id="rotate-steps">
+                      <option value="0">0 格</option>
+                      <option value="1" selected>1 格</option>
+                      <option value="2">2 格</option>
+                      <option value="3">3 格</option>
+                      <option value="4">4 格</option>
+                      <option value="5">5 格</option>
+                      <option value="6">6 格</option>
+                      <option value="7">7 格</option>
+                      <option value="8">8 格</option>
+                      <option value="9">9 格</option>
+                    </select>
+                  </label>
+                  <div class="control-action-cell">
+                    <button class="primary-button control-action-button" id="rotate-now-button" type="button">开始转动</button>
+                  </div>
+                  <div class="control-action-cell">
+                    <button class="secondary-button control-action-button" id="reset-scene-button" type="button">重置</button>
+                  </div>
+                </div>
+                <p class="control-note">总转动步数 = 圈数 × 8 + 格数。题目默认按箭头的顺时针理解，逆时针可以用来辅助观察位置变化。</p>
+              </div>
+            </div>
+          </section>
+
+          <aside class="challenge-panel">
+            <div class="challenge-card">
+              <div class="challenge-status-row">
+                <p class="eyebrow" id="challenge-zone-text">观察小舞台</p>
+                <div class="answer-status-badge is-hidden" id="answer-status-badge" aria-live="polite"></div>
+              </div>
+              <h3 id="challenge-title">先学会看位置</h3>
+              <p class="challenge-prompt" id="challenge-prompt"></p>
+              <div class="challenge-action-row">
+                <button class="primary-button" id="solution-button" type="button">分步讲解</button>
+              </div>
+              <div class="answer-grid" id="answer-grid"></div>
+              <div class="feedback-box" id="feedback-box">选一个你认为正确的答案吧。</div>
+              <div class="help-row">
+                <button class="ghost-button" id="hint-button">看提示</button>
+                <span id="hint-counter">提示 0 / 0</span>
+              </div>
+              <div class="hint-box" id="hint-box"></div>
+            </div>
+
+            <div class="mini-progress-card">
+              <div class="mini-progress-header">
+                <h3>闯关进度</h3>
+                <span id="mini-progress-text">0 / 12</span>
+              </div>
+              <div class="mini-progress-grid" id="mini-progress-grid"></div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="screen" id="screen-progress" aria-labelledby="progress-title">
+        <div class="section-header">
+          <div>
+            <p class="eyebrow">成长记录</p>
+            <h2 id="progress-title">看看今天已经会做多少题了。</h2>
+          </div>
+          <div class="summary-strip">
+            <button class="secondary-button" id="export-progress-button">导出进度</button>
+            <button class="secondary-button" id="import-progress-button">导入进度</button>
+            <input type="file" id="import-progress-file" accept=".json" style="display: none;">
+          </div>
+        </div>
+        <div class="progress-stats" id="progress-stats"></div>
+        <div class="record-list" id="record-list"></div>
+      </section>
+    </main>
+  </div>
+
+  <div class="overlay hidden" id="result-overlay" aria-live="polite">
+    <div class="result-card">
+      <p class="eyebrow" id="result-caption">闯关完成</p>
+      <h2 id="result-title">这一关完成啦</h2>
+      <div class="star-row" id="result-stars"></div>
+      <p class="result-text" id="result-text"></p>
+      <div class="result-actions">
+        <button class="secondary-button" id="review-level-button">再看讲解</button>
+        <button class="primary-button" id="next-level-button">下一关</button>
+        <button class="ghost-button" id="result-map-button">回地图</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js" defer></script>
+</body>
+</html>

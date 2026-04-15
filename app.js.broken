@@ -1,0 +1,1976 @@
+﻿"use strict";
+
+// ========== 閰嶇疆甯搁噺 ==========
+
+// 鏈湴瀛樺偍閿悕
+const STORAGE_KEY = "ferris-wheel-park-progress-v2";
+
+// 鍔ㄧ敾鏃堕暱锛堟绉掞級
+const ROTATE_MS = 520; // 鎽╁ぉ杞崟鏍艰浆鍔ㄥ姩鐢绘椂闀?const AUTO_ADVANCE_DELAY_MS = 1100; // 绛斿鍚庤嚜鍔ㄨ繘鍏ヤ笅涓€鍏崇殑寤惰繜
+const PLAYBACK_STEP_DELAY_MS = 1700; // 璁茶В妯″紡姣忔闂撮殧
+const ROTATION_STEP_INTERVAL_MS = 80; // 杩炵画杞姩鏃舵瘡鏍间箣闂寸殑闂撮殧
+
+// 鎽╁ぉ杞粨鏋勫父閲?const WHEEL_SLOT_COUNT = 8; // 鎽╁ぉ杞骇浣嶆暟閲?const BOTTOM_SLOT_INDEX = 4; // 鏈€涓嬫柟搴т綅绱㈠紩锛堟帓闃熶笂杞︿綅缃級
+
+// 鏄熺骇璇勫垎闃堝€?const STARS_PERFECT = 3; // 涓€娆＄瓟瀵?const STARS_GOOD = 2; // 閿欒1娆?const STARS_PASS = 1; // 閿欒2娆″強浠ヤ笂
+
+// 榛樿鎻愮ず鏂囨湰
+const COACH_DEFAULT = "鍏堢湅鐪嬫懇澶╄疆涓婄殑灏忓姩鐗╅兘鍧愬湪鍝噷銆?;
+const BASE_WHEEL = ["鍏斿瓙", "闈掕洐", "灏忕唺", "灏忔澗榧?, "鐙愮嫺", "鐔婄尗", "灏忕尨瀛?, "灏忔担鐔?];
+const QUEUE_ANIMALS = ["灏忚€侀紶", "灏忕嫍", "灏忕尓"];
+const SAME_HEIGHT_SLOT = {
+  1: 7,
+  2: 6,
+  3: 5,
+  5: 3,
+  6: 2,
+  7: 1
+};
+const ANIMAL_STYLES = {
+  "鍏斿瓙": { color: "#f7d7ef", short: "鍏斿瓙", avatar: "馃惏" },
+  "闈掕洐": { color: "#a8ddb1", short: "闈掕洐", avatar: "馃惛" },
+  "灏忕唺": { color: "#d8b189", short: "灏忕唺", avatar: "馃惢" },
+  "灏忔澗榧?: { color: "#f3c28a", short: "鏉鹃紶", avatar: "馃惪锔? },
+  "鐙愮嫺": { color: "#f6a66f", short: "鐙愮嫺", avatar: "馃" },
+  "鐔婄尗": { color: "#eff1f3", short: "鐔婄尗", avatar: "馃惣" },
+  "灏忕尨瀛?: { color: "#f2d06d", short: "鐚村瓙", avatar: "馃惖" },
+  "灏忔担鐔?: { color: "#cdd7e4", short: "娴ｇ唺", avatar: "馃" },
+  "灏忚€侀紶": { color: "#d9d5f1", short: "鑰侀紶", avatar: "馃惌" },
+  "灏忕嫍": { color: "#f0d4bf", short: "灏忕嫍", avatar: "馃惗" },
+  "灏忕尓": { color: "#f6bfd0", short: "灏忕尓", avatar: "馃惙" }
+};
+
+const ZONES = [
+  {
+    id: "observe",
+    name: "瑙傚療灏忚垶鍙?,
+    subtitle: "鍏堣璇嗕綅缃€佷笂涓嬪乏鍙冲拰璋佽窡璋佷竴鏍烽珮銆?,
+    band: "璁よ瘑鎽╁ぉ杞殑搴т綅",
+    color: "rgba(241, 184, 75, 0.2)"
+  },
+  {
+    id: "rotate",
+    name: "鎽╁ぉ杞箰鍥?,
+    subtitle: "瀛︿細椤烘椂閽堣浆鍔ㄥ悗鐨勪綅缃彉鍖栧拰鍚岄珮鍏崇郴銆?,
+    band: "鐪嬩竴鐪嬭浆浜嗗嚑鏍?,
+    color: "rgba(77, 176, 164, 0.2)"
+  },
+  {
+    id: "queue",
+    name: "鎺掗槦灏忓箍鍦?,
+    subtitle: "鎺掗槦鐨勫皬鍔ㄧ墿涔熶細鍔犲叆鎽╁ぉ杞紝涓€璧锋潵鎵句綅缃€?,
+    band: "鎺掗槦涓婅溅涔熻浼氭帹鐞?,
+    color: "rgba(245, 127, 141, 0.18)"
+  }
+];
+
+const QUESTION_TYPES = createQuestionTypes();
+const LEVELS = flattenQuestionTypes(QUESTION_TYPES);
+
+const dom = {};
+const state = {
+  currentScreen: "home",
+  currentLevelId: LEVELS[0].id,
+  scene: null,
+  selectedAnswer: "",
+  wrongAttempts: 0,
+  hintsShown: 0,
+  solutionViewed: false,
+  isPlayingSolution: false,
+  isRotating: false,
+  isAutoAdvancing: false,
+  playbackTimer: 0,
+  rotationTimer: 0,
+  autoAdvanceTimer: 0,
+  wheelAnimation: null,
+  rotateDuration: ROTATE_MS,
+  progress: loadProgress()
+};
+
+document.addEventListener("DOMContentLoaded", () => {
+  cacheDom();
+  renderWheelSpokes();
+  bindEvents();
+  navigateTo("home");
+  renderAll();
+});
+
+function cacheDom() {
+  dom.screens = document.querySelectorAll(".screen");
+  dom.navButtons = document.querySelectorAll("[data-nav]");
+  dom.startJourneyButton = document.querySelector("#start-journey-button");
+  dom.homeProgressButton = document.querySelector("#home-progress-button");
+  dom.mapSummary = document.querySelector("#map-summary");
+  dom.zoneList = document.querySelector("#zone-list");
+  dom.backToMapButton = document.querySelector("#back-to-map-button");
+  dom.gameZoneLabel = document.querySelector("#game-zone-label");
+  dom.gameTitle = document.querySelector("#game-title");
+  dom.gameLevelBadge = document.querySelector("#game-level-badge");
+  dom.challengeZoneText = document.querySelector("#challenge-zone-text");
+  dom.answerStatusBadge = document.querySelector("#answer-status-badge");
+  dom.challengeTitle = document.querySelector("#challenge-title");
+  dom.challengePrompt = document.querySelector("#challenge-prompt");
+  dom.answerGrid = document.querySelector("#answer-grid");
+  dom.feedbackBox = document.querySelector("#feedback-box");
+  dom.hintButton = document.querySelector("#hint-button");
+  dom.hintCounter = document.querySelector("#hint-counter");
+  dom.hintBox = document.querySelector("#hint-box");
+  dom.rotateNowButton = document.querySelector("#rotate-now-button");
+  dom.rotateDirection = document.querySelector("#rotate-direction");
+  dom.rotateSpeed = document.querySelector("#rotate-speed");
+  dom.rotateCircles = document.querySelector("#rotate-circles");
+  dom.rotateSteps = document.querySelector("#rotate-steps");
+  dom.resetSceneButton = document.querySelector("#reset-scene-button");
+  dom.solutionButton = document.querySelector("#solution-button");
+  dom.coachStatus = document.querySelector("#coach-status");
+  dom.coachBubble = document.querySelector("#coach-bubble");
+  dom.wheelBody = document.querySelector("#wheel-body");
+  dom.wheelSpokes = document.querySelector("#wheel-spokes");
+  dom.cabinLayer = document.querySelector("#cabin-layer");
+  dom.queueLine = document.querySelector("#queue-line");
+  dom.queueTip = document.querySelector("#queue-tip");
+  dom.miniProgressText = document.querySelector("#mini-progress-text");
+  dom.miniProgressGrid = document.querySelector("#mini-progress-grid");
+  dom.progressStats = document.querySelector("#progress-stats");
+  dom.recordList = document.querySelector("#record-list");
+  dom.resultOverlay = document.querySelector("#result-overlay");
+  dom.resultCaption = document.querySelector("#result-caption");
+  dom.resultTitle = document.querySelector("#result-title");
+  dom.resultStars = document.querySelector("#result-stars");
+  dom.resultText = document.querySelector("#result-text");
+  dom.reviewLevelButton = document.querySelector("#review-level-button");
+  dom.nextLevelButton = document.querySelector("#next-level-button");
+  dom.resultMapButton = document.querySelector("#result-map-button");
+  dom.exportProgressButton = document.querySelector("#export-progress-button");
+  dom.importProgressButton = document.querySelector("#import-progress-button");
+  dom.importProgressFile = document.querySelector("#import-progress-file");
+}
+
+function bindEvents() {
+  dom.navButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      navigateTo(button.dataset.nav);
+    });
+  });
+
+  // 浣跨敤浜嬩欢濮旀墭澶勭悊绛旀鎸夐挳鐐瑰嚮
+  dom.answerGrid.addEventListener("click", (event) => {
+    const button = event.target.closest(".answer-button");
+    if (button && button.dataset.answer) {
+      submitAnswer(button.dataset.answer);
+    }
+  });
+
+  dom.startJourneyButton.addEventListener("click", () => navigateTo("map"));
+  dom.homeProgressButton.addEventListener("click", () => navigateTo("progress"));
+  dom.backToMapButton.addEventListener("click", () => navigateTo("map"));
+  dom.rotateNowButton.addEventListener("click", () => advanceScene());
+  dom.rotateSpeed.addEventListener("change", () => {
+    state.rotateDuration = Number(dom.rotateSpeed.value) || ROTATE_MS;
+    renderScene();
+  });
+  dom.resetSceneButton.addEventListener("click", () => resetCurrentLevelScene());
+  dom.hintButton.addEventListener("click", () => revealHint());
+  dom.solutionButton.addEventListener("click", () => playSolution());
+  dom.reviewLevelButton.addEventListener("click", () => {
+    closeResultOverlay();
+    playSolution();
+  });
+  dom.nextLevelButton.addEventListener("click", () => startNextLevel());
+  dom.resultMapButton.addEventListener("click", () => {
+    closeResultOverlay();
+    navigateTo("map");
+  });
+
+  // 杩涘害瀵煎嚭/瀵煎叆鍔熻兘
+  dom.exportProgressButton.addEventListener("click", () => exportProgress());
+  dom.importProgressButton.addEventListener("click", () => {
+    dom.importProgressFile.click();
+  });
+  dom.importProgressFile.addEventListener("change", (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      importProgress(file);
+    }
+  });
+
+  window.addEventListener("resize", () => {
+    if (state.currentScreen === "game") {
+      renderScene();
+    }
+  });
+}
+
+function createLevels() {
+  return [
+    {
+      id: "L1",
+      zoneId: "observe",
+      title: "鍏堝浼氱湅浣嶇疆",
+      prompt: "鐜板湪璋佸潗鍦ㄥ厰瀛愮殑椤烘椂閽堜笅涓€鏍硷紵",
+      mode: "observe",
+      choices: ["闈掕洐", "灏忕唺", "灏忔担鐔?, "鐙愮嫺"],
+      answer: "闈掕洐",
+      hints: [
+        "鍏堟壘鍒板厰瀛愮幇鍦ㄥ潗鐨勪綅缃€?,
+        "椤烘椂閽堝氨鏄窡鐫€绠ご鏂瑰悜寰€鍓嶈蛋涓€鏍笺€?,
+        "鐪嬬湅鍏斿瓙鍙宠竟涓嬩竴鏍兼槸璋併€?
+      ],
+      solutionSteps: [
+        stepText("鍏堟壘鍒板厰瀛愶紝瀹冨潗鍦ㄦ渶涓婇潰銆?, { slotIndex: 0 }),
+        stepText("椤烘椂閽堟柟鍚戣窡鐫€绠ご寰€鍓嶈蛋涓€鏍笺€?, { slotIndex: 1 }),
+        stepText("鍏斿瓙鐨勪笅涓€鏍兼槸闈掕洐锛屾墍浠ョ瓟妗堟槸闈掕洐銆?, { slotIndex: 1, answer: "闈掕洐" })
+      ]
+    },
+    {
+      id: "L2",
+      zoneId: "observe",
+      title: "鎵惧悓鏍烽珮鐨勫皬浼欎即",
+      prompt: "鐜板湪璋佸拰灏忕尨瀛愪竴鏍烽珮锛?,
+      mode: "observe",
+      choices: ["灏忕唺", "鍏斿瓙", "灏忔澗榧?, "闈掕洐"],
+      answer: "灏忕唺",
+      hints: [
+        "鍏堟壘鍒板皬鐚村瓙鐜板湪鐨勪綅缃€?,
+        "鍜屽畠涓€鏍烽珮锛屽氨鏄壘宸﹀彸涓よ竟鍚屼竴鏉℃í绾夸笂瀵瑰簲鐨勪綅缃€?,
+        "鐪嬬湅灏忕尨瀛愮殑姝ｅ闈㈠悓楂樹綅缃槸璋併€?
+      ],
+      solutionSteps: [
+        stepText("鍏堟壘鍒板皬鐚村瓙锛屽畠鍧愬湪宸﹁竟銆?, { slotIndex: 6 }),
+        stepText("鍜屽乏杈逛竴鏍烽珮鐨勪綅缃湪鍙宠竟銆?, { slotIndex: 2 }),
+        stepText("鍙宠竟鍧愮潃灏忕唺锛屾墍浠ョ瓟妗堟槸灏忕唺銆?, { slotIndex: 2, answer: "灏忕唺" })
+      ]
+    },
+    {
+      id: "L3",
+      zoneId: "observe",
+      title: "璁よ瘑鏈€楂樼殑浣嶇疆",
+      prompt: "鐜板湪璋佸潗鍦ㄦ渶涓婇潰锛?,
+      mode: "observe",
+      choices: ["鍏斿瓙", "鐙愮嫺", "闈掕洐", "灏忕尨瀛?],
+      answer: "鍏斿瓙",
+      hints: [
+        "鍏堢湅鐪嬫渶楂樼殑閭ｄ釜搴т綅銆?,
+        "鏈€涓婇潰鍙湁涓€涓綅缃€?,
+        "鐪嬩竴鐪嬫渶椤朵笂鐨勫姩鐗╁悕瀛椼€?
+      ],
+      solutionSteps: [
+        stepText("鏈€涓婇潰鐨勪綅缃氨鏄渶楂樼偣銆?, { slotIndex: 0 }),
+        stepText("鍧愬湪鏈€楂樼偣鐨勬槸鍏斿瓙銆?, { slotIndex: 0, answer: "鍏斿瓙" }),
+        stepText("鎵€浠ョ瓟妗堟槸鍏斿瓙銆?, { slotIndex: 0, answer: "鍏斿瓙" })
+      ]
+    },
+    {
+      id: "L4",
+      zoneId: "observe",
+      title: "璁よ瘑鍓嶅悗浣嶇疆",
+      prompt: "鐔婄尗鐨勯€嗘椂閽堜竴鏍兼槸璋侊紵",
+      mode: "observe",
+      choices: ["鐙愮嫺", "灏忕尨瀛?, "灏忔澗榧?, "灏忔担鐔?],
+      answer: "鐙愮嫺",
+      hints: [
+        "鍏堟壘鍒扮唺鐚殑浣嶇疆銆?,
+        "閫嗘椂閽堟槸鍜岀澶寸浉鍙嶇殑鏂瑰悜銆?,
+        "浠庣唺鐚偅閲屽線鍥為€€涓€鏍肩湅鐪嬫槸璋併€?
+      ],
+      solutionSteps: [
+        stepText("鍏堟壘鍒扮唺鐚紝瀹冨潗鍦ㄥ乏涓嬫柟銆?, { slotIndex: 5 }),
+        stepText("閫嗘椂閽堝氨鏄線鍥為€€涓€鏍笺€?, { slotIndex: 4 }),
+        stepText("閫€鍥炲幓浼氱湅鍒扮嫄鐙革紝鎵€浠ョ瓟妗堟槸鐙愮嫺銆?, { slotIndex: 4, answer: "鐙愮嫺" })
+      ]
+    },
+    {
+      id: "L5",
+      zoneId: "rotate",
+      title: "杞埌鎸囧畾浣嶇疆",
+      prompt: "濡傛灉鐙愮嫺杞埌灏忕尨瀛愮殑浣嶇疆涓婏紝閭ｄ箞璋佷笌灏忔澗榧犱竴鏍烽珮锛?,
+      mode: "rotate",
+      targetSteps: rotationStepsForAnimalToSlot("鐙愮嫺", animalSlot("灏忕尨瀛?)),
+      choices: ["闈掕洐", "灏忕唺", "灏忔担鐔?, "鍏斿瓙"],
+      answer: "闈掕洐",
+      hints: [
+        "鍏堢湅鐙愮嫺瑕佽浆鍑犳牸鎵嶈兘鍒板皬鐚村瓙鍘熸潵鐨勪綅缃€?,
+        "鎶婃墍鏈夊皬鍔ㄧ墿涓€璧烽『鏃堕拡杞悓鏍峰鐨勬牸鏁般€?,
+        "鍐嶅幓鎵惧拰灏忔澗榧犱竴鏍烽珮鐨勪綅缃槸璋併€?
+      ],
+      solutionSteps: buildRotateSameHeightSteps("鐙愮嫺", "灏忕尨瀛?, "灏忔澗榧?, "闈掕洐")
+    },
+    {
+      id: "L6",
+      zoneId: "rotate",
+      title: "杞姩鍚庡啀鎵惧悓楂?,
+      prompt: "濡傛灉鍏斿瓙鐨勪綅缃浆鍒板皬鐔婄殑浣嶇疆涓婏紝閭ｄ箞璋佷笌鐔婄尗涓€鏍烽珮锛?,
+      mode: "rotate",
+      targetSteps: rotationStepsForAnimalToSlot("鍏斿瓙", animalSlot("灏忕唺")),
+      choices: ["灏忔担鐔?, "鐙愮嫺", "闈掕洐", "灏忕尨瀛?],
+      answer: "灏忔担鐔?,
+      hints: [
+        "鍏堟壘鍏斿瓙瑕佽浆鍒板皬鐔婂師鏉ョ殑浣嶇疆锛岄渶瑕佸嚑鏍笺€?,
+        "鎵€鏈夊皬鍔ㄧ墿涓€璧烽『鏃堕拡绉诲姩鍚屾牱澶氱殑鏍兼暟銆?,
+        "鍐嶇湅鐪嬪拰鐔婄尗涓€鏍烽珮鐨勯偅涓綅缃槸璋併€?
+      ],
+      solutionSteps: buildRotateSameHeightSteps("鍏斿瓙", "灏忕唺", "鐔婄尗", "灏忔担鐔?)
+    },
+    {
+      id: "L7",
+      zoneId: "rotate",
+      title: "杞竴鏍肩湅鍙樺寲",
+      prompt: "鎽╁ぉ杞『鏃堕拡杞?1 鏍煎悗锛岃皝鍧愬埌鍏斿瓙鍘熸潵鐨勪綅缃笂锛?,
+      mode: "rotate",
+      targetSteps: 1,
+      choices: ["灏忔担鐔?, "闈掕洐", "鐙愮嫺", "灏忕尨瀛?],
+      answer: "灏忔担鐔?,
+      hints: [
+        "鍏堟壘鍒板厰瀛愬師鏉ョ殑浣嶇疆锛屽氨鏄渶涓婇潰銆?,
+        "椤烘椂閽堣浆涓€鏍煎悗锛屽師鏉ュ乏涓婄殑鍔ㄧ墿浼氭潵鍒版渶涓婇潰銆?,
+        "鐪嬬湅宸︿笂瑙掓槸璋併€?
+      ],
+      solutionSteps: [
+        stepText("鍏斿瓙鍘熸潵鐨勪綅缃湪鏈€涓婇潰銆?, { slotIndex: 0 }),
+        stepText("椤烘椂閽堣浆涓€鏍煎悗锛屽乏涓婄殑浣嶇疆浼氳浆鍒版渶涓婇潰銆?, { slotIndex: 7 }),
+        stepText("宸︿笂鍘熸潵鏄皬娴ｇ唺锛屾墍浠ョ瓟妗堟槸灏忔担鐔娿€?, { slotIndex: 0, answer: "灏忔担鐔?, sceneSteps: 1 })
+      ]
+    },
+    {
+      id: "L8",
+      zoneId: "rotate",
+      title: "杞笁鏍肩湅缁堢偣",
+      prompt: "鎽╁ぉ杞『鏃堕拡杞?3 鏍煎悗锛屽皬鐚村瓙浼氳浆鍒拌皝鍘熸潵鐨勪綅缃笂锛?,
+      mode: "rotate",
+      targetSteps: 3,
+      choices: ["闈掕洐", "灏忕唺", "灏忔担鐔?, "鐙愮嫺"],
+      answer: "闈掕洐",
+      hints: [
+        "鍏堟壘鍒板皬鐚村瓙鐨勮捣鐐广€?,
+        "椤烘椂閽堣繛缁蛋 3 鏍笺€?,
+        "鏁板埌鏈€鍚庯紝鐪嬬湅鍋滃湪璋佸師鏉ョ殑浣嶇疆銆?
+      ],
+      solutionSteps: [
+        stepText("灏忕尨瀛愪竴寮€濮嬪湪宸﹁竟銆?, { slotIndex: 6 }),
+        stepText("椤烘椂閽堣蛋 3 鏍硷細宸﹁竟鍒板乏涓婏紝鍐嶅埌鏈€涓婏紝鍐嶅埌鍙充笂銆?, { slotIndex: 1 }),
+        stepText("鍙充笂鍘熸潵鏄潚铔欑殑浣嶇疆锛屾墍浠ョ瓟妗堟槸闈掕洐銆?, { slotIndex: 1, answer: "闈掕洐", sceneSteps: 3 })
+      ]
+    },
+    {
+      id: "L9",
+      zoneId: "queue",
+      title: "鎺掗槦灏忓姩鐗╀笂杞?,
+      prompt: "濡傛灉鎺掗槦鐨勫皬鑰侀紶鍧愬埌灏忕唺鐨勪綅缃笂锛岄偅涔堝皬鐚細鍧愬埌鍝釜浣嶇疆涓婏紵",
+      mode: "queue",
+      queueTargetAnimal: "灏忚€侀紶",
+      queueTargetSlot: animalSlot("灏忕唺"),
+      choices: ["鍏斿瓙鐨勪綅缃?, "闈掕洐鐨勪綅缃?, "灏忔澗榧犵殑浣嶇疆", "鐔婄尗鐨勪綅缃?],
+      answer: "鍏斿瓙鐨勪綅缃?,
+      hints: [
+        "鎺掗槦鐨勫皬鍔ㄧ墿浠庢渶涓嬮潰鐨勪綅缃笂杞︺€?,
+        "姣忚浆涓€鏍硷紝涓嬩竴鍙帓闃熺殑灏忓姩鐗╀篃浼氬潗鍒版渶涓嬮潰銆?,
+        "绛夊皬鑰侀紶杞埌灏忕唺鍘熸潵鐨勪綅缃椂锛屽啀鐪嬪皬鐚湪鍝噷銆?
+      ],
+      solutionSteps: buildQueuePositionSteps("灏忚€侀紶", "灏忕唺", "灏忕尓", "鍏斿瓙")
+    },
+    {
+      id: "L10",
+      zoneId: "queue",
+      title: "璋佸厛鍧愬埌搴曢儴",
+      prompt: "鎺掗槦鐨勫皬鑰侀紶鍒氬潗涓婃懇澶╄疆鏃讹紝瀹冨潗鍒板摢涓綅缃笂锛?,
+      mode: "queue",
+      queueTargetAnimal: "灏忚€侀紶",
+      queueTargetBoardingOnly: true,
+      choices: ["鐙愮嫺鐨勪綅缃?, "鍏斿瓙鐨勪綅缃?, "鐔婄尗鐨勪綅缃?, "灏忕尨瀛愮殑浣嶇疆"],
+      answer: "鐙愮嫺鐨勪綅缃?,
+      hints: [
+        "鎺掗槦鐨勫皬鍔ㄧ墿鍏堝潗鍒版渶涓嬮潰銆?,
+        "鐪嬬湅鏈€涓嬮潰鍘熸潵鏄皝鐨勪綅缃€?,
+        "灏忚€侀紶鍒氫笂杞︽椂杩樻病鏈夌户缁浆鍔ㄣ€?
+      ],
+      solutionSteps: [
+        stepText("鎺掗槦鐨勫皬鍔ㄧ墿浠庢渶涓嬮潰鐨勪綅缃笂杞︺€?, { slotIndex: 4 }),
+        stepText("鏈€涓嬮潰鍘熸潵鏄嫄鐙哥殑浣嶇疆銆?, { slotIndex: 4 }),
+        stepText("鎵€浠ュ皬鑰侀紶鍒氬潗涓婅溅鏃讹紝鍦ㄧ嫄鐙哥殑浣嶇疆銆?, { slotIndex: 4, queueAnimal: "灏忚€侀紶", answer: "鐙愮嫺鐨勪綅缃? })
+      ]
+    },
+    {
+      id: "L11",
+      zoneId: "queue",
+      title: "绗簩鍙皬鍔ㄧ墿鍘诲摢鍎?,
+      prompt: "濡傛灉灏忚€侀紶宸茬粡鍧愬埌灏忕唺鐨勪綅缃笂锛岄偅涔堝皬鐙楀潗鍒拌皝鍘熸潵鐨勪綅缃笂锛?,
+      mode: "queue",
+      queueTargetAnimal: "灏忚€侀紶",
+      queueTargetSlot: animalSlot("灏忕唺"),
+      choices: ["闈掕洐鐨勪綅缃?, "鍏斿瓙鐨勪綅缃?, "灏忔澗榧犵殑浣嶇疆", "灏忔担鐔婄殑浣嶇疆"],
+      answer: "闈掕洐鐨勪綅缃?,
+      hints: [
+        "鍏堣灏忚€侀紶涓婅溅骞惰浆鍒板皬鐔婂師鏉ョ殑浣嶇疆銆?,
+        "姣忚浆涓€鏍硷紝灏忕嫍涔熶細鍦ㄦ渶涓嬮潰琛ヤ笂鍘汇€?,
+        "绛夊皬鑰侀紶鍒扮洰鏍囦綅缃椂锛屽啀鐪嬪皬鐙楀仠鍦ㄥ摢涓師鏉ョ殑浣嶇疆銆?
+      ],
+      solutionSteps: buildQueuePositionSteps("灏忚€侀紶", "灏忕唺", "灏忕嫍", "闈掕洐")
+    },
+    {
+      id: "L12",
+      zoneId: "queue",
+      title: "鏈€涓婇潰鐨勬柊鏈嬪弸",
+      prompt: "濡傛灉灏忚€侀紶宸茬粡鍧愬埌灏忕唺鐨勪綅缃笂锛岄偅涔堟渶涓婇潰鏄皝锛?,
+      mode: "queue",
+      queueTargetAnimal: "灏忚€侀紶",
+      queueTargetSlot: animalSlot("灏忕唺"),
+      choices: ["灏忕尓", "灏忕嫍", "灏忚€侀紶", "闈掕洐"],
+      answer: "灏忕尓",
+      hints: [
+        "鍏堣灏忚€侀紶涓婅溅锛屽啀缁х画杞埌灏忕唺鍘熸潵鐨勪綅缃€?,
+        "灏忕嫍鍜屽皬鐚篃浼氫竴涓竴涓ˉ鍒板簳閮ㄤ笂杞︺€?,
+        "鍒颁簡閭ｄ釜鏃跺埢锛屽啀鐪嬬湅鏈€涓婇潰鐨勫骇浣嶆槸璋併€?
+      ],
+      solutionSteps: [
+        stepText("鍏堣灏忚€侀紶浠庢渶涓嬮潰涓婅溅銆?, { slotIndex: 4, queueAnimal: "灏忚€侀紶" }),
+        stepText("鎽╁ぉ杞户缁『鏃堕拡杞姩锛屽皬鐙楀拰灏忕尓涔熶細渚濇琛ュ埌鏈€涓嬮潰銆?, { queueAnimal: "灏忕尓" }),
+        stepText("褰撳皬鑰侀紶杞埌灏忕唺鍘熸潵鐨勪綅缃椂锛屾渶涓婇潰浼氭槸灏忕尓銆?, {
+          answer: "灏忕尓",
+          queueAnimal: "灏忕尓",
+          sceneQueueTarget: { animal: "灏忚€侀紶", slot: animalSlot("灏忕唺") }
+        })
+      ]
+    }
+  ].map((level, index) => {
+    const zone = ZONES.find((item) => item.id === level.zoneId);
+    return {
+      ...level,
+      index,
+      number: index + 1,
+      zoneName: zone.name
+    };
+  });
+}
+
+function renderAll() {
+  renderNav();
+  renderMap();
+  renderGame();
+  renderProgress();
+}
+
+function renderNav() {
+  dom.navButtons.forEach((button) => {
+    const isActive = button.dataset.nav === state.currentScreen;
+    button.classList.toggle("is-active", isActive);
+  });
+}
+
+function navigateTo(screenName) {
+  if (screenName !== "game") {
+    clearPlayback();
+  }
+  state.currentScreen = screenName;
+  document.body.classList.toggle("is-game-screen", screenName === "game");
+  dom.screens.forEach((screen) => {
+    screen.classList.toggle("is-active", screen.id === `screen-${screenName}`);
+  });
+  renderNav();
+  if (screenName === "map") {
+    renderMap();
+  }
+  if (screenName === "progress") {
+    renderProgress();
+  }
+  if (screenName === "game") {
+    renderGame();
+  }
+}
+
+function renderMap() {
+  const completed = state.progress.completedLevelIds.length;
+  const totalStars = LEVELS.reduce((sum, level) => sum + getBestStars(level.id), 0);
+  const unlocked = getUnlockedLevelCount();
+  dom.mapSummary.innerHTML = [
+    summaryCardHtml("宸插畬鎴?, `${completed} / ${LEVELS.length}`),
+    summaryCardHtml("宸茶В閿?, `${unlocked} 棰榒),
+    summaryCardHtml("鏄熸槦", `${totalStars} 棰梎)
+  ].join("");
+
+  dom.zoneList.innerHTML = ZONES.map((zone) => renderZoneCard(zone)).join("");
+  dom.zoneList.querySelectorAll(".question-chip").forEach((button) => {
+    button.addEventListener("click", () => {
+      const level = levelById(button.dataset.levelId);
+      if (level && isLevelUnlocked(level.number)) {
+        startLevel(level.id);
+      }
+    });
+  });
+}
+
+function renderZoneCard(zone) {
+  const zoneLevels = LEVELS.filter((level) => level.zoneId === zone.id);
+  const zoneTypes = QUESTION_TYPES.filter((type) => type.zoneId === zone.id);
+  const completedCount = zoneLevels.filter((level) => isLevelComplete(level.id)).length;
+  return `
+    <article class="zone-card">
+      <div class="zone-card-header">
+        <div>
+          <h3>${zone.name}</h3>
+          <p>${zone.subtitle}</p>
+        </div>
+        <span class="zone-theme-band" style="background:${zone.color};">${zone.band}</span>
+      </div>
+      <div class="type-card-grid">
+        ${zoneTypes.map((type) => renderTypeCard(type)).join("")}
+      </div>
+      <p>鏈尯鍩熷凡瀹屾垚 ${completedCount} / ${zoneLevels.length} 棰樸€?/p>
+    </article>
+  `;
+}
+
+function renderTypeCard(type) {
+  const typeLevels = levelsByType(type.id);
+  const completedCount = typeLevels.filter((level) => isLevelComplete(level.id)).length;
+  return `
+    <div class="type-card">
+      <div class="type-card-header">
+        <strong>绗?${type.typeNumber} 绫?/strong>
+        <span>${completedCount} / ${typeLevels.length}</span>
+      </div>
+      <h4>${type.title}</h4>
+      <p>${type.summary}</p>
+      <div class="question-chip-grid">
+        ${typeLevels.map((level) => renderQuestionChip(level)).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderQuestionChip(level) {
+  const unlocked = isLevelUnlocked(level.number);
+  const done = isLevelComplete(level.id);
+  const classNames = ["question-chip"];
+  if (!unlocked) {
+    classNames.push("is-locked");
+  }
+  if (done) {
+    classNames.push("is-done");
+  }
+  if (level.id === state.currentLevelId && state.currentScreen === "game") {
+    classNames.push("is-current");
+  }
+  return `
+    <button class="${classNames.join(" ")}" data-level-id="${level.id}" ${unlocked ? "" : "disabled"}>
+      ${level.questionNumber}
+    </button>
+  `;
+}
+
+function renderGame() {
+  const level = currentLevel();
+  if (!state.scene) {
+    state.scene = createSceneForLevel(level);
+  }
+  hideAnswerStatusBadge();
+  dom.gameZoneLabel.textContent = `${level.zoneName} 路 绗?${level.typeNumber} 绫婚鍨媊;
+  dom.gameTitle.textContent = `${level.typeTitle} 路 绗?${level.questionNumber} 棰榒;
+  dom.gameLevelBadge.textContent = `${level.number} / ${LEVELS.length}`;
+  dom.challengeZoneText.textContent = `绗?${level.typeNumber} 绫?路 ${level.zoneName}`;
+  dom.challengeTitle.textContent = level.typeTitle;
+  dom.challengePrompt.textContent = `绗?${level.questionNumber} 棰橈細${level.prompt}`;
+  renderAnswers();
+  renderScene();
+  renderHintPanel();
+  renderMiniProgress();
+  setCoach("瑙傚療涓?, COACH_DEFAULT);
+}
+
+function renderAnswers() {
+  const level = currentLevel();
+  dom.answerGrid.innerHTML = level.choices.map((choice) => `
+    <button class="answer-button" data-answer="${choice}">${choice}</button>
+  `).join("");
+  setAnswerButtonsDisabled(state.isAutoAdvancing);
+}
+
+function renderScene() {
+  const slots = getSlotLayout();
+  dom.cabinLayer.style.setProperty("--rotate-duration", `${state.rotateDuration}ms`);
+  dom.wheelBody.style.transform = "rotate(0deg)";
+  dom.cabinLayer.innerHTML = state.scene.wheel.map((animal, slotIndex) => renderCabin(animal, slotIndex, slots[slotIndex])).join("");
+  dom.queueLine.innerHTML = state.scene.queue.map((animal, index) => renderQueueAnimal(animal, index)).join("");
+  dom.queueTip.textContent = state.scene.queue.length ? "绛夊€欎腑鐨勫皬鍔ㄧ墿" : "鎺掗槦鍖烘殏鏃剁┖浜?;
+}
+
+function renderCabin(animal, slotIndex, slot) {
+  const style = ANIMAL_STYLES[animal] || { color: "#ffffff", short: animal, avatar: "馃惥" };
+  return `
+    <div class="animal-cabin" data-slot-index="${slotIndex}" data-animal="${animal}" style="--slot-x:${slot.x}px; --slot-y:${slot.y}px; background:${style.color};">
+      <div class="animal-cabin-inner">
+        <span class="animal-avatar" aria-hidden="true">${style.avatar}</span>
+        <span class="animal-name">${animal}</span>
+      </div>
+    </div>
+  `;
+}
+
+function renderQueueAnimal(animal) {
+  const style = ANIMAL_STYLES[animal] || { color: "#ffffff", avatar: "馃惥" };
+  return `
+    <div class="queue-animal" data-queue-animal="${animal}" style="background:${style.color};">
+      <span class="queue-avatar" aria-hidden="true">${style.avatar}</span>
+      <span class="queue-name">${animal}</span>
+    </div>
+  `;
+}
+
+function renderWheelSpokes() {
+  dom.wheelSpokes.innerHTML = Array.from({ length: WHEEL_SLOT_COUNT }, (_, index) => {
+    const angle = index * 45;
+    return `<div class="wheel-spoke" style="transform: rotate(${angle}deg);"></div>`;
+  }).join("");
+}
+
+function renderHintPanel() {
+  const level = currentLevel();
+  dom.hintCounter.textContent = `鎻愮ず ${state.hintsShown} / ${level.hints.length}`;
+  if (!state.hintsShown) {
+    dom.hintBox.textContent = "";
+    return;
+  }
+  dom.hintBox.innerHTML = `<ul>${level.hints.slice(0, state.hintsShown).map((hint) => `<li>${hint}</li>`).join(鈥溾€?}</ul>`;
+}
+
+function renderMiniProgress() {
+  const currentTypeLevels = levelsByType(currentLevel().typeId);
+  const completed = currentTypeLevels.filter((level) => isLevelComplete(level.id)).length;
+  dom.miniProgressText.textContent = `${completed} / ${currentTypeLevels.length}`;
+  dom.miniProgressGrid.innerHTML = currentTypeLevels.map((level) => {
+    const classNames = ["mini-level-dot"];
+    if (level.id === state.currentLevelId) {
+      classNames.push("is-current");
+    } else if (isLevelComplete(level.id)) {
+      classNames.push("is-done");
+    } else if (!isLevelUnlocked(level.number)) {
+      classNames.push("is-locked");
+    }
+    return `<div class="${classNames.join(" ")}">${level.number}</div>`;
+  }).join("");
+}
+
+function renderProgress() {
+  const totalStars = LEVELS.reduce((sum, level) => sum + getBestStars(level.id), 0);
+  dom.progressStats.innerHTML = [
+    progressCardHtml("闂叧瀹屾垚", `${state.progress.completedLevelIds.length} / ${LEVELS.length}`),
+    progressCardHtml("鏀堕泦鏄熸槦", `${totalStars} 棰梎),
+    progressCardHtml("鐢ㄤ簡鎻愮ず", `${state.progress.stats.hintsUsed} 娆)
+  ].join("");
+
+  dom.recordList.innerHTML = ZONES.map((zone) => renderRecordCard(zone)).join("");
+}
+
+function renderRecordCard(zone) {
+  const zoneTypes = QUESTION_TYPES.filter((type) => type.zoneId === zone.id);
+  return `
+    <article class="record-card">
+      <div class="record-card-header">
+        <div>
+          <h3>${zone.name}</h3>
+          <p>${zone.subtitle}</p>
+        </div>
+      </div>
+      <div class="type-card-grid">
+        ${zoneTypes.map((type) => renderRecordTypeCard(type)).join("")}
+      </div>
+    </article>
+  `;
+}
+
+function renderRecordTypeCard(type) {
+  const typeLevels = levelsByType(type.id);
+  const completedCount = typeLevels.filter((level) => isLevelComplete(level.id)).length;
+  const starCount = typeLevels.reduce((sum, level) => sum + getBestStars(level.id), 0);
+  return `
+    <div class="record-chip">
+      <strong>绗?${type.typeNumber} 绫?/strong>
+      <div>${type.title}</div>
+      <div>宸插畬鎴?${completedCount} / ${typeLevels.length} 棰?/div>
+      <div>绱 ${starCount} 棰楁槦</div>
+    </div>
+  `;
+}
+
+function summaryCardHtml(label, value) {
+  return `<div class="summary-card"><strong>${value}</strong><p>${label}</p></div>`;
+}
+
+function progressCardHtml(label, value) {
+  return `<div class="progress-card"><strong>${value}</strong><p>${label}</p></div>`;
+}
+
+function startLevel(levelId) {
+  closeResultOverlay();
+  state.currentLevelId = levelId;
+  resetLevelState();
+  state.scene = createSceneForLevel(currentLevel());
+  navigateTo("game");
+}
+
+function resetLevelState() {
+  clearPlayback();
+  state.selectedAnswer = "";
+  state.wrongAttempts = 0;
+  state.hintsShown = 0;
+  state.solutionViewed = false;
+  state.rotateDuration = Number(dom.rotateSpeed.value) || ROTATE_MS;
+  hideAnswerStatusBadge();
+  setFeedback("");
+  renderHintPanel();
+}
+
+function resetCurrentLevelScene() {
+  if (state.isAutoAdvancing) {
+    return;
+  }
+  clearPlayback();
+  state.scene = createSceneForLevel(currentLevel());
+  setCoach("瑙傚療涓?, COACH_DEFAULT);
+  setFeedback("宸茬粡鍥炲埌鏈€寮€濮嬬殑鏍峰瓙锛屽彲浠ラ噸鏂拌瀵熷暒銆?);
+  renderScene();
+}
+
+function currentLevel() {
+  return levelById(state.currentLevelId);
+}
+
+function levelById(levelId) {
+  return LEVELS.find((level) => level.id === levelId);
+}
+
+function createSceneForLevel(level) {
+  const scene = {
+    wheel: [...BASE_WHEEL],
+    queue: [...(level.queueAnimals || QUEUE_ANIMALS)],
+    boarded: [],
+    rotationCount: 0
+  };
+  if (level.mode === "queue") {
+    boardNextQueueAnimal(scene);
+  }
+  return scene;
+}
+
+function loadProgress() {
+  const fallback = {
+    version: 1,
+    completedLevelIds: [],
+    starsByLevel: {},
+    stats: {
+      hintsUsed: 0,
+      solutionsViewed: 0,
+      totalAttempts: 0
+    },
+    recordsByLevel: {}
+  };
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) {
+      return fallback;
+    }
+    const parsed = JSON.parse(raw);
+    return {
+      ...fallback,
+      ...parsed,
+      stats: { ...fallback.stats, ...parsed.stats },
+      starsByLevel: { ...fallback.starsByLevel, ...parsed.starsByLevel },
+      recordsByLevel: { ...fallback.recordsByLevel, ...parsed.recordsByLevel }
+    };
+  } catch (error) {
+    return fallback;
+  }
+}
+
+function saveProgress() {
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state.progress));
+}
+
+// ========== 杩涘害瀵煎嚭/瀵煎叆鍔熻兘 ==========
+
+function exportProgress() {
+  try {
+    const progressData = {
+      version: state.progress.version || 1,
+      exportDate: new Date().toISOString(),
+      data: state.progress
+    };
+
+    const jsonString = JSON.stringify(progressData, null, 2);
+    const blob = new Blob([jsonString], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `ferris-wheel-progress-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    alert("杩涘害宸插鍑烘垚鍔燂紒");
+  } catch (error) {
+    alert("瀵煎嚭澶辫触锛? + error.message);
+  }
+}
+
+function importProgress(file) {
+  const reader = new FileReader();
+
+  reader.onload = (event) => {
+    try {
+      const importedData = JSON.parse(event.target.result);
+
+      // 楠岃瘉鏁版嵁鏍煎紡
+      if (!importedData.data || !importedData.data.completedLevelIds) {
+        throw new Error("瀵煎叆鐨勬枃浠舵牸寮忎笉姝ｇ'");
+      }
+
+      // 纭瀵煎叆鎿嶄綔
+      const confirmed = confirm(
+        `纭畾瑕佸鍏ヨ繘搴﹀悧锛焅n\n` +
+        `瀵煎嚭鏃ユ湡锛?{new Date(importedData.exportDate).toLocaleString()}\n` +
+        `宸插畬鎴愬叧鍗★細${importedData.data.completedLevelIds.length} / ${LEVELS.length}\n\n` +
+        `褰撳墠杩涘害灏嗚瑕嗙洊锛乣
+      );
+
+      if (!confirmed) {
+        return;
+      }
+
+      // 瀵煎叆鏁版嵁
+      state.progress = {
+        ...state.progress,
+        ...importedData.data
+      };
+
+      // 淇濆瓨鍒?localStorage
+      saveProgress();
+
+      // 閲嶆柊娓叉煋鐣岄潰
+      renderAll();
+
+      // 娓呯┖鏂囦欢杈撳叆
+      dom.importProgressFile.value = "";
+
+      alert("杩涘害瀵煎叆鎴愬姛锛?);
+    } catch (error) {
+      alert("瀵煎叆澶辫触锛? + error.message);
+      dom.importProgressFile.value = "";
+    }
+  };
+
+  reader.onerror = () => {
+    alert("璇诲彇鏂囦欢澶辫触");
+    dom.importProgressFile.value = "";
+  };
+
+  reader.readAsText(file);
+}
+
+function getLevelRecord(levelId) {
+  if (!state.progress.recordsByLevel[levelId]) {
+    state.progress.recordsByLevel[levelId] = {
+      attempts: 0,
+      hintsUsed: 0,
+      solutionViewed: false,
+      lastPlayedAt: ""
+    };
+  }
+  return state.progress.recordsByLevel[levelId];
+}
+
+function getBestStars(levelId) {
+  return state.progress.starsByLevel[levelId] || 0;
+}
+
+function isLevelComplete(levelId) {
+  return state.progress.completedLevelIds.includes(levelId);
+}
+
+function getUnlockedLevelCount() {
+  return Math.min(LEVELS.length, state.progress.completedLevelIds.length + 1);
+}
+
+function isLevelUnlocked(levelNumber) {
+  return levelNumber <= getUnlockedLevelCount();
+}
+
+function getSlotLayout() {
+  const size = dom.wheelBody.clientWidth || 380;
+  const radius = size * 0.38;
+  return Array.from({ length: WHEEL_SLOT_COUNT }, (_, slotIndex) => {
+    const angle = (-90 + slotIndex * 45) * (Math.PI / 180);
+    return {
+      x: Math.cos(angle) * radius,
+      y: Math.sin(angle) * radius
+    };
+  });
+}
+
+function animalSlot(animal) {
+  return BASE_WHEEL.indexOf(animal);
+}
+
+function rotationStepsForAnimalToSlot(animal, targetSlot) {
+  const start = animalSlot(animal);
+  return (targetSlot - start + WHEEL_SLOT_COUNT) % WHEEL_SLOT_COUNT;
+}
+
+function stepText(text, options = {}) {
+  return {
+    text,
+    ...options
+  };
+}
+
+function buildRotateSameHeightSteps(movingAnimal, targetAnimal, sameHeightAnimal, answerAnimal) {
+  const steps = rotationStepsForAnimalToSlot(movingAnimal, animalSlot(targetAnimal));
+  return [
+    stepText(`鍏堟壘鍒?{movingAnimal}鍜?{targetAnimal}鍘熸潵鐨勪綅缃€俙, {
+      slotIndex: animalSlot(movingAnimal)
+    }),
+    stepText(`${movingAnimal}瑕侀『鏃堕拡杞?${steps} 鏍硷紝鎵嶈兘鍒?{targetAnimal}鍘熸潵鐨勪綅缃€俙, {
+      slotIndex: animalSlot(targetAnimal),
+      sceneSteps: steps
+    }),
+    stepText(`鍏ㄩ儴涓€璧疯浆瀹屼互鍚庯紝鍐嶅幓鎵惧拰${sameHeightAnimal}涓€鏍烽珮鐨勪綅缃€俙, {
+      slotIndex: findAnimalSlotAfterSteps(sameHeightAnimal, steps)
+    }),
+    stepText(`閭ｄ釜浣嶇疆涓婃槸${answerAnimal}锛屾墍浠ョ瓟妗堟槸${answerAnimal}銆俙, {
+      slotIndex: findAnimalSlotAfterSteps(answerAnimal, steps),
+      answer: answerAnimal
+    })
+  ];
+}
+
+function buildQueuePositionSteps(targetAnimal, targetAnimalPositionName, watchAnimal, answerPositionOwner) {
+  return [
+    stepText(`鎺掗槦鐨勫皬鍔ㄧ墿鍏堜粠鏈€涓嬮潰涓婅溅锛屾墍浠ュ厛璁?{targetAnimal}鍧愬埌搴曢儴銆俙, {
+      slotIndex: 4,
+      queueAnimal: targetAnimal
+    }),
+    stepText(`缁х画椤烘椂閽堣浆锛岀洿鍒?{targetAnimal}鏉ュ埌${targetAnimalPositionName}鍘熸潵鐨勪綅缃€俙, {
+      sceneQueueTarget: { animal: targetAnimal, slot: animalSlot(targetAnimalPositionName) }
+    }),
+    stepText(`杩欐椂鍐嶇湅${watchAnimal}鍋滃湪鍝噷銆俙, {
+      queueAnimal: watchAnimal
+    }),
+    stepText(`${watchAnimal}鍋滃湪${answerPositionOwner}鍘熸潵鐨勪綅缃紝鎵€浠ョ瓟妗堟槸${answerPositionOwner}鐨勪綅缃€俙, {
+      answer: `${answerPositionOwner}鐨勪綅缃甡
+    })
+  ];
+}
+
+function findAnimalSlotAfterSteps(animal, steps) {
+  return (animalSlot(animal) + steps) % WHEEL_SLOT_COUNT;
+}
+
+function advanceScene() {
+  if (state.isRotating || state.isPlayingSolution || state.isAutoAdvancing) {
+    return;
+  }
+  clearPlayback();
+  state.rotateDuration = Number(dom.rotateSpeed.value) || ROTATE_MS;
+  const direction = dom.rotateDirection.value;
+  const circles = Number(dom.rotateCircles.value) || 0;
+  const slots = Number(dom.rotateSteps.value) || 0;
+  let steps = circles * WHEEL_SLOT_COUNT + slots;
+  if (!steps) {
+    steps = 1;
+    dom.rotateSteps.value = "1";
+    setFeedback("褰撳墠鏄?0 鍦?0 鏍硷紝绯荤粺鍏堟寜 1 鏍煎府浣犺浆鍔ㄣ€?);
+  }
+  const level = currentLevel();
+  let finishedSteps = 0;
+
+  state.isRotating = true;
+  setMotionDisabled(true);
+
+  const runOneStep = () => {
+    animateWheelTurn(direction, () => {
+      applyRotationByDirection(level, direction);
+      finishedSteps += 1;
+      renderScene();
+      setCoach("杞姩涓?, buildRotationMessage(level.mode, direction, finishedSteps, steps));
+      if (finishedSteps >= steps) {
+        state.isRotating = false;
+        setMotionDisabled(false);
+        return;
+      }
+      state.rotationTimer = window.setTimeout(runOneStep, ROTATION_STEP_INTERVAL_MS);
+    });
+  };
+
+  runOneStep();
+}
+
+function revealHint() {
+  if (state.isAutoAdvancing) {
+    return;
+  }
+  const level = currentLevel();
+  if (state.hintsShown >= level.hints.length) {
+    setFeedback("鎻愮ず宸茬粡鍏ㄩ儴鐪嬪畬鍟︼紝璇曠潃鑷繁鎯充竴鎯炽€?);
+    return;
+  }
+  state.hintsShown += 1;
+  state.progress.stats.hintsUsed += 1;
+  getLevelRecord(level.id).hintsUsed += 1;
+  saveProgress();
+  renderHintPanel();
+  setCoach("鎻愮ず涓?, level.hints[state.hintsShown - 1]);
+}
+
+function submitAnswer(answer) {
+  if (state.isPlayingSolution || state.isRotating || state.isAutoAdvancing) {
+    return;
+  }
+  const level = currentLevel();
+  state.selectedAnswer = answer;
+  state.progress.stats.totalAttempts += 1;
+  const record = getLevelRecord(level.id);
+  record.attempts += 1;
+  record.lastPlayedAt = new Date().toISOString();
+
+  const buttons = [...dom.answerGrid.querySelectorAll(".answer-button")];
+  buttons.forEach((button) => {
+    button.classList.remove("is-correct", "is-wrong");
+    if (button.dataset.answer === answer) {
+      button.classList.add(answer === level.answer ? "is-correct" : "is-wrong");
+    }
+    if (button.dataset.answer === level.answer && answer === level.answer) {
+      button.classList.add("is-correct");
+    }
+  });
+
+  if (answer === level.answer) {
+    const stars = computeStars();
+    finishLevel(level.id, stars);
+    state.isAutoAdvancing = true;
+    setCoach("绛斿鍟?, `鍋氬緱瀵癸紝绛旀鏄?{level.answer}銆俙);
+    setFeedback(`绛斿浜嗐€?{buildCorrectReason(level)}`);
+    showAnswerStatusBadge(stars);
+    setMotionDisabled(true);
+    setAnswerButtonsDisabled(true);
+    queueAutoAdvance();
+  } else {
+    state.wrongAttempts += 1;
+    hideAnswerStatusBadge();
+    saveProgress();
+    setCoach("鍐嶆兂鎯?, "杩欐涓嶅锛屽厛鍥炲埌棰樼洰閲屾壘鍏抽敭浣嶇疆銆?);
+    setFeedback(`杩樹笉瀵瑰摝銆傚厛鐪嬬湅棰樼洰閲屾槸璋佸湪绉诲姩锛屽啀鎵炬渶鍚庤鐪嬬殑浣嶇疆銆俙);
+  }
+}
+
+function playSolution() {
+  if (state.isAutoAdvancing) {
+    return;
+  }
+  const level = currentLevel();
+  clearPlayback();
+  state.solutionViewed = true;
+  state.progress.stats.solutionsViewed += 1;
+  getLevelRecord(level.id).solutionViewed = true;
+  saveProgress();
+  setFeedback("姝ｅ湪鍥炴斁鎬濊矾锛岃璺熺潃楂樹寒浣嶇疆涓€璧风湅銆?);
+  setMotionDisabled(true);
+  state.isPlayingSolution = true;
+
+  const steps = level.solutionSteps || [];
+  let currentStep = 0;
+
+  const showStep = () => {
+    if (currentStep >= steps.length) {
+      state.isPlayingSolution = false;
+      setMotionDisabled(false);
+      setCoach("璁茶В瀹屾垚", "璁茶В鐪嬪畬浜嗭紝鐜板湪鍙互鑷繁璇曠潃鍥炵瓟銆?);
+      return;
+    }
+
+    const step = steps[currentStep];
+    applySolutionStep(step, level);
+    currentStep += 1;
+    state.playbackTimer = window.setTimeout(showStep, PLAYBACK_STEP_DELAY_MS);
+  };
+
+  showStep();
+}
+
+function applySolutionStep(step, level) {
+  let previewScene = cloneScene(createSceneForLevel(level));
+  if (typeof step.sceneSteps === "number") {
+    if (level.mode === "queue") {
+      for (let index = 0; index < step.sceneSteps; index += 1) {
+        rotateQueueScene(previewScene);
+      }
+    } else {
+      previewScene.wheel = applyRotationSteps(previewScene.wheel, step.sceneSteps);
+      previewScene.rotationCount = step.sceneSteps;
+    }
+  }
+  if (step.sceneQueueTarget) {
+    previewScene = simulateQueueUntil(step.sceneQueueTarget.animal, step.sceneQueueTarget.slot);
+  }
+  state.scene = previewScene;
+  renderScene();
+  clearHighlights();
+  if (typeof step.slotIndex === "number") {
+    highlightSlot(step.slotIndex, step.answer ? "is-answer" : "is-highlighted");
+  }
+  if (step.queueAnimal) {
+    highlightQueueAnimal(step.queueAnimal);
+    highlightCabinAnimal(step.queueAnimal, step.answer ? "is-answer" : "is-highlighted");
+  }
+  if (step.answer) {
+    highlightAnswerButton(step.answer);
+  }
+  setCoach("璁茶В涓?, step.text);
+}
+
+function finishLevel(levelId, stars) {
+  if (!state.progress.completedLevelIds.includes(levelId)) {
+    state.progress.completedLevelIds.push(levelId);
+  }
+  state.progress.starsByLevel[levelId] = Math.max(getBestStars(levelId), stars);
+  saveProgress();
+  renderAll();
+}
+
+function computeStars() {
+  if (state.wrongAttempts === 1) {
+    return 2;
+  }
+  if (state.wrongAttempts >= 2) {
+    return 1;
+  }
+  return 3;
+}
+
+function buildCorrectReason(level) {
+  if (level.mode === "queue" && level.answer.includes("浣嶇疆")) {
+    return "鎺掗槦鍖虹殑灏忓姩鐗╀細浠庢渶涓嬮潰涓婅溅锛屽啀璺熺潃鎽╁ぉ杞竴璧疯浆鍔ㄣ€?;
+  }
+  if (level.mode === "rotate") {
+    return "鍏堢畻杞簡鍑犳牸锛屽啀鐪嬬洰鏍囦綅缃笂鐨勫皬鍔ㄧ墿銆?;
+  }
+  return "鍏堟壘鍑嗕綅缃紝鍐嶆寜棰樼洰瑕佹眰鍘荤湅瀵瑰簲鐨勫皬鍔ㄧ墿銆?;
+}
+
+function showResultOverlay(level, stars) {
+  dom.resultCaption.textContent = `${level.zoneName}瀹屾垚`;
+  dom.resultTitle.textContent = `绗?${level.typeNumber} 绫?路 绗?${level.questionNumber} 棰樺畬鎴愬暒`;
+  dom.resultStars.innerHTML = Array.from({ length: 3 }, (_, index) => {
+    const active = index < stars;
+    return `<span class="star-token${active ? "" : " is-off"}">鈽?/span>`;
+  }).join("");
+  dom.resultText.textContent = stars === 3
+    ? "涓€閬嶅氨瑙傚療瀵逛簡锛岀湡鍘夊銆?
+    : stars === 2
+      ? "宸茬粡绛斿鍟︼紝鍐嶅瑙傚療涓€鐐硅繕鑳芥嬁鏇村鏄熸槦銆?
+      : "鐪嬪畬璁茶В涔熻兘瀛︿細锛岀户缁姞娌广€?;
+  dom.resultOverlay.classList.remove("hidden");
+
+  const nextLevel = LEVELS[level.index + 1];
+  dom.nextLevelButton.disabled = !nextLevel;
+}
+
+function closeResultOverlay() {
+  dom.resultOverlay.classList.add("hidden");
+}
+
+function startNextLevel() {
+  const nextLevel = LEVELS[currentLevel().index + 1];
+  if (!nextLevel) {
+    closeResultOverlay();
+    navigateTo("map");
+    return;
+  }
+  closeResultOverlay();
+  startLevel(nextLevel.id);
+}
+
+function setFeedback(text) {
+  dom.feedbackBox.textContent = text;
+}
+
+function showAnswerStatusBadge(stars) {
+  dom.answerStatusBadge.innerHTML = `
+    <span class="answer-status-text">绛斿鍟?/span>
+    <span class="answer-status-stars" aria-hidden="true">
+      ${Array.from({ length: 3 }, (_, index) => {
+        const active = index < stars;
+        return `<span class="star-token${active ? "" : " is-off"}">鈽?/span>`;
+      }).join("")}
+    </span>
+  `;
+  dom.answerStatusBadge.setAttribute("aria-label", `鍥炵瓟姝ｇ'锛屾湰棰樿幏寰?{stars}棰楁槦銆俙);
+  dom.answerStatusBadge.classList.remove("is-hidden");
+}
+
+function hideAnswerStatusBadge() {
+  dom.answerStatusBadge.innerHTML = "";
+  dom.answerStatusBadge.classList.add("is-hidden");
+}
+
+function setAnswerButtonsDisabled(disabled) {
+  dom.answerGrid.querySelectorAll(".answer-button").forEach((button) => {
+    button.disabled = disabled;
+  });
+}
+
+function queueAutoAdvance() {
+  if (state.autoAdvanceTimer) {
+    window.clearTimeout(state.autoAdvanceTimer);
+  }
+  state.autoAdvanceTimer = window.setTimeout(() => {
+    state.autoAdvanceTimer = 0;
+    state.isAutoAdvancing = false;
+    startNextLevel();
+  }, AUTO_ADVANCE_DELAY_MS);
+}
+
+function setCoach(status, text) {
+  dom.coachStatus.textContent = status;
+  dom.coachBubble.textContent = text;
+}
+
+function clearPlayback() {
+  if (state.playbackTimer) {
+    window.clearTimeout(state.playbackTimer);
+    state.playbackTimer = 0;
+  }
+  if (state.rotationTimer) {
+    window.clearTimeout(state.rotationTimer);
+    state.rotationTimer = 0;
+  }
+  if (state.autoAdvanceTimer) {
+    window.clearTimeout(state.autoAdvanceTimer);
+    state.autoAdvanceTimer = 0;
+  }
+  if (state.wheelAnimation) {
+    try {
+      state.wheelAnimation.cancel();
+    } catch (error) {
+      // Ignore browser-specific animation cancel issues.
+    }
+    state.wheelAnimation = null;
+  }
+  dom.wheelBody.style.transform = "rotate(0deg)";
+  state.isPlayingSolution = false;
+  state.isRotating = false;
+  state.isAutoAdvancing = false;
+  setMotionDisabled(false);
+  setAnswerButtonsDisabled(false);
+  hideAnswerStatusBadge();
+  clearHighlights();
+}
+
+function clearHighlights() {
+  dom.cabinLayer.querySelectorAll(".animal-cabin").forEach((item) => {
+    item.classList.remove("is-highlighted", "is-answer", "is-faded");
+  });
+  dom.queueLine.querySelectorAll(".queue-animal").forEach((item) => {
+    item.classList.remove("is-highlighted", "is-boarded");
+  });
+  dom.answerGrid.querySelectorAll(".answer-button").forEach((item) => {
+    item.classList.remove("is-correct", "is-wrong");
+  });
+}
+
+function highlightSlot(slotIndex, className) {
+  const node = dom.cabinLayer.querySelector(`[data-slot-index="${slotIndex}"]`);
+  if (node) {
+    node.classList.add(className);
+  }
+}
+
+function highlightQueueAnimal(animal) {
+  const queueNode = [...dom.queueLine.querySelectorAll(".queue-animal")]
+    .find((node) => node.dataset.queueAnimal === animal);
+  if (queueNode) {
+    queueNode.classList.add("is-highlighted");
+  }
+}
+
+function highlightCabinAnimal(animal, className) {
+  const cabinNode = dom.cabinLayer.querySelector(`[data-animal="${animal}"]`);
+  if (cabinNode) {
+    cabinNode.classList.add(className);
+  }
+}
+
+function highlightAnswerButton(answer) {
+  const answerNode = dom.answerGrid.querySelector(`[data-answer="${answer}"]`);
+  if (answerNode) {
+    answerNode.classList.add("is-correct");
+  }
+}
+
+function rotateWheelClockwise(wheel) {
+  return [wheel[7], ...wheel.slice(0, 7)];
+}
+
+function rotateWheelCounterclockwise(wheel) {
+  return [...wheel.slice(1), wheel[0]];
+}
+
+function applyRotationSteps(wheel, steps) {
+  let nextWheel = [...wheel];
+  for (let index = 0; index < steps; index += 1) {
+    nextWheel = rotateWheelClockwise(nextWheel);
+  }
+  return nextWheel;
+}
+
+function boardNextQueueAnimal(scene) {
+  if (!scene.queue.length) {
+    return;
+  }
+  const nextAnimal = scene.queue.shift();
+  scene.wheel[4] = nextAnimal;
+  scene.boarded.push(nextAnimal);
+}
+
+function rotateQueueScene(scene, direction = "clockwise") {
+  if (direction === "counterclockwise") {
+    scene.wheel = rotateWheelCounterclockwise(scene.wheel);
+    scene.rotationCount -= 1;
+    return;
+  }
+  scene.wheel = rotateWheelClockwise(scene.wheel);
+  scene.rotationCount += 1;
+  boardNextQueueAnimal(scene);
+}
+
+function cloneScene(scene) {
+  return {
+    wheel: [...scene.wheel],
+    queue: [...scene.queue],
+    boarded: [...scene.boarded],
+    rotationCount: scene.rotationCount
+  };
+}
+
+function simulateQueueUntil(targetAnimal, targetSlot) {
+  const scene = createSceneForLevel({ mode: "queue" });
+  let guard = 0;
+  while (scene.wheel[targetSlot] !== targetAnimal && guard < 16) {
+    rotateQueueScene(scene);
+    guard += 1;
+  }
+  return scene;
+}
+
+function applyRotationByDirection(level, direction) {
+  if (level.mode === "queue") {
+    rotateQueueScene(state.scene, direction);
+    return;
+  }
+  if (direction === "counterclockwise") {
+    state.scene.wheel = rotateWheelCounterclockwise(state.scene.wheel);
+    state.scene.rotationCount -= 1;
+    return;
+  }
+  state.scene.wheel = rotateWheelClockwise(state.scene.wheel);
+  state.scene.rotationCount += 1;
+}
+
+function buildRotationMessage(mode, direction, currentStep, totalSteps) {
+  const directionText = direction === "clockwise" ? "椤烘椂閽? : "閫嗘椂閽?;
+  if (mode === "queue" && direction === "counterclockwise") {
+    return `姝ｅ湪${directionText}瑙傚療锛岀 ${currentStep} / ${totalSteps} 鏍笺€傛帓闃熼鐨勪笂杞﹁鍒欎粛鐒朵互椤烘椂閽堜负鍑嗐€俙;
+  }
+  return `姝ｅ湪${directionText}杞姩锛岀 ${currentStep} / ${totalSteps} 鏍笺€傜户缁瀵熷皬鍔ㄧ墿浣嶇疆鍙樺寲銆俙;
+}
+
+function setMotionDisabled(disabled) {
+  dom.solutionButton.disabled = disabled;
+  dom.resetSceneButton.disabled = disabled;
+  dom.hintButton.disabled = disabled;
+  dom.rotateDirection.disabled = disabled;
+  dom.rotateSpeed.disabled = disabled;
+  dom.rotateCircles.disabled = disabled;
+  dom.rotateSteps.disabled = disabled;
+  dom.rotateNowButton.disabled = disabled;
+}
+
+function animateWheelTurn(direction, onFinish) {
+  const angle = direction === "counterclockwise" ? -45 : 45;
+  let finished = false;
+  const finishTurn = () => {
+    if (finished) {
+      return;
+    }
+    finished = true;
+    if (state.rotationTimer) {
+      window.clearTimeout(state.rotationTimer);
+      state.rotationTimer = 0;
+    }
+    if (state.animationFrameId) {
+      window.cancelAnimationFrame(state.animationFrameId);
+      state.animationFrameId = 0;
+    }
+    dom.wheelBody.style.transform = "rotate(0deg)";
+    if (state.wheelAnimation) {
+      try {
+        state.wheelAnimation.onfinish = null;
+        state.wheelAnimation.cancel();
+      } catch (error) {
+        // Ignore browser-specific animation cleanup issues.
+      }
+      state.wheelAnimation = null;
+    }
+    onFinish();
+  };
+
+  // 浣跨敤 Web Animations API锛堜紭鍏堬級
+  if (typeof dom.wheelBody.animate === "function") {
+    state.wheelAnimation = dom.wheelBody.animate(
+      [
+        { transform: "rotate(0deg)" },
+        { transform: `rotate(${angle}deg)` }
+      ],
+      {
+        duration: state.rotateDuration,
+        easing: "cubic-bezier(0.2, 0.82, 0.22, 1)",
+        fill: "forwards"
+      }
+    );
+
+    state.wheelAnimation.onfinish = finishTurn;
+    state.rotationTimer = window.setTimeout(finishTurn, state.rotateDuration + ROTATION_STEP_INTERVAL_MS);
+    return;
+  }
+
+  // 闄嶇骇鏂规锛氫娇鐢?requestAnimationFrame 瀹炵幇骞虫粦鍔ㄧ敾
+  const startTime = performance.now();
+  const animate = (currentTime) => {
+    const elapsed = currentTime - startTime;
+    const progress = Math.min(elapsed / state.rotateDuration, 1);
+
+    // 浣跨敤缂撳姩鍑芥暟 cubic-bezier(0.2, 0.82, 0.22, 1)
+    const easeProgress = cubicBezier(progress, 0.2, 0.82, 0.22, 1);
+    const currentAngle = angle * easeProgress;
+
+    dom.wheelBody.style.transform = `rotate(${currentAngle}deg)`;
+
+    if (progress < 1) {
+      state.animationFrameId = window.requestAnimationFrame(animate);
+    } else {
+      finishTurn();
+    }
+  };
+
+  state.animationFrameId = window.requestAnimationFrame(animate);
+}
+
+// 涓夋璐濆灏旂紦鍔ㄥ嚱鏁?function cubicBezier(t, p1x, p1y, p2x, p2y) {
+  // 绠€鍖栫殑璐濆灏旀洸绾胯绠楋紙閫傜敤浜?0-1 鑼冨洿锛?  const cx = 3 * p1x;
+  const bx = 3 * (p2x - p1x) - cx;
+  const ax = 1 - cx - bx;
+
+  const cy = 3 * p1y;
+  const by = 3 * (p2y - p1y) - cy;
+  const ay = 1 - cy - by;
+
+  const sampleCurveX = (t) => ((ax * t + bx) * t + cx) * t;
+  const sampleCurveY = (t) => ((ay * t + by) * t + cy) * t;
+
+  // 浣跨敤鐗涢】杩唬娉曟眰瑙?x(t) = t 鐨?t 鍊?  let t2 = t;
+  for (let i = 0; i < 8; i++) {
+    const x = sampleCurveX(t2) - t;
+    if (Math.abs(x) < 0.001) break;
+    const dx = (3 * ax * t2 + 2 * bx) * t2 + cx;
+    if (Math.abs(dx) < 0.000001) break;
+    t2 -= x / dx;
+  }
+
+  return sampleCurveY(t2);
+}
+
+function createQuestionTypes() {
+  const queueOrders = {
+    A: ["灏忚€侀紶", "灏忕嫍", "灏忕尓"],
+    B: ["灏忕嫍", "灏忕尓", "灏忚€侀紶"],
+    C: ["灏忕尓", "灏忚€侀紶", "灏忕嫍"],
+    D: ["灏忚€侀紶", "灏忕尓", "灏忕嫍"],
+    E: ["灏忕嫍", "灏忚€侀紶", "灏忕尓"]
+  };
+
+  return [
+    {
+      id: "T1",
+      zoneId: "observe",
+      title: "鍏堝浼氱湅浣嶇疆",
+      summary: "鎵鹃『鏃堕拡涓嬩竴鏍?,
+      questions: ["鍏斿瓙", "闈掕洐", "灏忕唺", "鐔婄尗", "灏忔担鐔?].map((animal) => createObserveNextQuestion(animal))
+    },
+    {
+      id: "T2",
+      zoneId: "observe",
+      title: "鎵惧悓鏍烽珮鐨勫皬浼欎即",
+      summary: "鐪嬭皝鍜岃皝涓€鏍烽珮",
+      questions: ["闈掕洐", "灏忕唺", "灏忔澗榧?, "鐔婄尗", "灏忕尨瀛?].map((animal) => createSameHeightQuestion(animal))
+    },
+    {
+      id: "T3",
+      zoneId: "observe",
+      title: "璁よ瘑鏈€楂樼殑浣嶇疆",
+      summary: "鐪嬫渶涓婇潰鐨勫骇浣?,
+      questions: [0, 1, 2, 3, 4].map((steps) => createTopQuestion(steps))
+    },
+    {
+      id: "T4",
+      zoneId: "observe",
+      title: "璁よ瘑鍓嶅悗浣嶇疆",
+      summary: "鎵鹃€嗘椂閽堝墠涓€鏍?,
+      questions: ["鐔婄尗", "灏忕尨瀛?, "灏忔担鐔?, "鐙愮嫺", "灏忔澗榧?].map((animal) => createCounterclockwiseQuestion(animal))
+    },
+    {
+      id: "T5",
+      zoneId: "rotate",
+      title: "杞埌鎸囧畾浣嶇疆",
+      summary: "杞埌鐩爣鍚庡啀鎵惧悓楂?,
+      questions: [
+        createRotateSameHeightQuestion("鐙愮嫺", "灏忕尨瀛?, "灏忔澗榧?),
+        createRotateSameHeightQuestion("鍏斿瓙", "灏忕唺", "鐔婄尗"),
+        createRotateSameHeightQuestion("灏忔澗榧?, "鐙愮嫺", "灏忕尨瀛?),
+        createRotateSameHeightQuestion("鐔婄尗", "灏忔担鐔?, "闈掕洐"),
+        createRotateSameHeightQuestion("闈掕洐", "鐔婄尗", "灏忕尨瀛?)
+      ]
+    },
+    {
+      id: "T6",
+      zoneId: "rotate",
+      title: "杞姩鍚庡啀鎵惧悓楂?,
+      summary: "鎹竴缁勫姩鐗╃户缁帹鐞?,
+      questions: [
+        createRotateSameHeightQuestion("鍏斿瓙", "鐙愮嫺", "灏忔澗榧?),
+        createRotateSameHeightQuestion("灏忕尨瀛?, "灏忕唺", "灏忔澗榧?),
+        createRotateSameHeightQuestion("灏忔担鐔?, "灏忔澗榧?, "灏忕尨瀛?),
+        createRotateSameHeightQuestion("灏忕唺", "灏忔担鐔?, "鐔婄尗"),
+        createRotateSameHeightQuestion("鐙愮嫺", "闈掕洐", "灏忕唺")
+      ]
+    },
+    {
+      id: "T7",
+      zoneId: "rotate",
+      title: "杞嚑鏍肩湅璋佹潵",
+      summary: "璋佸潗鍒版煇涓師鏉ョ殑浣嶇疆涓?,
+      questions: [
+        createRotateOccupyQuestion("鍏斿瓙", 1),
+        createRotateOccupyQuestion("闈掕洐", 2),
+        createRotateOccupyQuestion("灏忕唺", 3),
+        createRotateOccupyQuestion("鐔婄尗", 4),
+        createRotateOccupyQuestion("灏忕尨瀛?, 5)
+      ]
+    },
+    {
+      id: "T8",
+      zoneId: "rotate",
+      title: "杞嚑鏍肩湅缁堢偣",
+      summary: "鏌愬彧鍔ㄧ墿浼氬埌璋佸師鏉ョ殑浣嶇疆",
+      questions: [
+        createRotateDestinationQuestion("灏忕尨瀛?, 3),
+        createRotateDestinationQuestion("鐙愮嫺", 2),
+        createRotateDestinationQuestion("鐔婄尗", 4),
+        createRotateDestinationQuestion("灏忔担鐔?, 1),
+        createRotateDestinationQuestion("鍏斿瓙", 6)
+      ]
+    },
+    {
+      id: "T9",
+      zoneId: "queue",
+      title: "鎺掗槦鍚庣湅浣嶇疆",
+      summary: "鐩爣鍔ㄧ墿鍒颁簡浠ュ悗鍐嶇湅鍒汉鐨勪綅缃?,
+      questions: [
+        createQueueWatcherPositionQuestion(queueOrders.A, "灏忚€侀紶", "灏忕唺", "灏忕尓"),
+        createQueueWatcherPositionQuestion(queueOrders.B, "灏忕嫍", "鍏斿瓙", "灏忚€侀紶"),
+        createQueueWatcherPositionQuestion(queueOrders.C, "灏忚€侀紶", "灏忕尨瀛?, "灏忕嫍"),
+        createQueueWatcherPositionQuestion(queueOrders.D, "灏忕嫍", "鐔婄尗", "灏忚€侀紶"),
+        createQueueWatcherPositionQuestion(queueOrders.E, "灏忕尓", "灏忕唺", "灏忚€侀紶")
+      ]
+    },
+    {
+      id: "T10",
+      zoneId: "queue",
+      title: "璋佸厛鍧愬埌搴曢儴",
+      summary: "鐪嬪垰涓婅溅鏃跺潗鍦ㄥ摢涓綅缃?,
+      questions: [
+        createQueueBoardQuestion(queueOrders.A, "灏忚€侀紶"),
+        createQueueBoardQuestion(queueOrders.A, "灏忕嫍"),
+        createQueueBoardQuestion(queueOrders.A, "灏忕尓"),
+        createQueueBoardQuestion(queueOrders.B, "灏忚€侀紶"),
+        createQueueBoardQuestion(queueOrders.C, "灏忚€侀紶")
+      ]
+    },
+    {
+      id: "T11",
+      zoneId: "queue",
+      title: "绗簩鍙皬鍔ㄧ墿鍘诲摢鍎?,
+      summary: "鐩爣鍔ㄧ墿鍒颁綅鍚庡啀鐪嬪彟涓€鍙?,
+      questions: [
+        createQueueWatcherPositionQuestion(queueOrders.A, "灏忚€侀紶", "灏忕唺", "灏忕嫍"),
+        createQueueWatcherPositionQuestion(queueOrders.B, "灏忕尓", "鍏斿瓙", "灏忕嫍"),
+        createQueueWatcherPositionQuestion(queueOrders.C, "灏忕嫍", "灏忕尨瀛?, "灏忕尓"),
+        createQueueWatcherPositionQuestion(queueOrders.D, "灏忕尓", "鐔婄尗", "灏忕嫍"),
+        createQueueWatcherPositionQuestion(queueOrders.E, "灏忚€侀紶", "灏忕尨瀛?, "灏忕尓")
+      ]
+    },
+    {
+      id: "T12",
+      zoneId: "queue",
+      title: "鏈€涓婇潰鐨勬柊鏈嬪弸",
+      summary: "鐩爣鍔ㄧ墿鍒颁綅鍚庣湅鏈€涓婇潰",
+      questions: [
+        createQueueTopQuestion(queueOrders.A, "灏忚€侀紶", "灏忕唺"),
+        createQueueTopQuestion(queueOrders.B, "灏忕嫍", "灏忕尨瀛?),
+        createQueueTopQuestion(queueOrders.C, "灏忕尓", "鐔婄尗"),
+        createQueueTopQuestion(queueOrders.D, "灏忕嫍", "鍏斿瓙"),
+        createQueueTopQuestion(queueOrders.B, "灏忚€侀紶", "鍏斿瓙")
+      ]
+    }
+  ].map((type, index) => ({
+    ...type,
+    typeNumber: index + 1
+  }));
+}
+
+function flattenQuestionTypes(types) {
+  let globalIndex = 0;
+  return types.flatMap((type) => {
+    const zone = ZONES.find((item) => item.id === type.zoneId);
+    return type.questions.map((question, questionIndex) => {
+      const level = {
+        ...question,
+        id: `${type.id}-Q${questionIndex + 1}`,
+        typeId: type.id,
+        typeTitle: type.title,
+        typeSummary: type.summary,
+        typeNumber: type.typeNumber,
+        questionNumber: questionIndex + 1,
+        zoneName: zone.name,
+        number: globalIndex + 1,
+        index: globalIndex
+      };
+      globalIndex += 1;
+      return level;
+    });
+  });
+}
+
+function createObserveNextQuestion(animal) {
+  const startSlot = animalSlot(animal);
+  const targetSlot = (startSlot + 1) % WHEEL_SLOT_COUNT;
+  const answer = BASE_WHEEL[targetSlot];
+  return {
+    title: "椤烘椂閽堜笅涓€鏍?,
+    prompt: `鐜板湪璋佸潗鍦?{animal}鐨勯『鏃堕拡涓嬩竴鏍硷紵`,
+    mode: "observe",
+    choices: buildChoiceSet(answer, BASE_WHEEL),
+    answer,
+    hints: [
+      `鍏堟壘鍒?{animal}鐜板湪鍧愮殑浣嶇疆銆俙,
+      "椤烘椂閽堝氨鏄窡鐫€绠ご鏂瑰悜寰€鍓嶈蛋銆?,
+      "鍙湅鍓嶉潰涓€鏍硷紝涓嶈澶氳蛋銆?
+    ],
+    solutionSteps: [
+      stepText(`鍏堟壘鍒?{animal}鐨勪綅缃€俙, { slotIndex: startSlot }),
+      stepText("椤虹潃绠ご寰€鍓嶇湅涓€鏍笺€?, { slotIndex: targetSlot }),
+      stepText(`閭ｄ釜浣嶇疆鏄?{answer}锛屾墍浠ョ瓟妗堟槸${answer}銆俙, { slotIndex: targetSlot, answer })
+    ]
+  };
+}
+
+function createSameHeightQuestion(animal) {
+  const slotIndex = animalSlot(animal);
+  const targetSlot = SAME_HEIGHT_SLOT[slotIndex];
+  const answer = BASE_WHEEL[targetSlot];
+  return {
+    title: "璋佸拰璋佷竴鏍烽珮",
+    prompt: `鐜板湪璋佸拰${animal}涓€鏍烽珮锛焋,
+    mode: "observe",
+    choices: buildChoiceSet(answer, BASE_WHEEL),
+    answer,
+    hints: [
+      `鍏堟壘鍒?{animal}鐨勪綅缃€俙,
+      "涓€鏍烽珮锛屽氨鏄湅瀹冨乏鍙冲悓涓€鏉℃í绾夸笂鐨勪綅缃€?,
+      "鎵惧埌鍜屽畠鍚岄珮鐨勯偅涓€涓骇浣嶃€?
+    ],
+    solutionSteps: [
+      stepText(`鍏堟壘鍒?{animal}鐨勪綅缃€俙, { slotIndex }),
+      stepText("鍜屽畠涓€鏍烽珮鐨勪綅缃湪鍙︿竴杈瑰悓涓€鏉℃í绾夸笂銆?, { slotIndex: targetSlot }),
+      stepText(`鍧愬湪閭ｉ噷鐨勬槸${answer}锛屾墍浠ョ瓟妗堟槸${answer}銆俙, { slotIndex: targetSlot, answer })
+    ]
+  };
+}
+
+function createTopQuestion(steps) {
+  const scene = applyRotationSteps(BASE_WHEEL, steps);
+  const answer = scene[0];
+  const prompt = steps
+    ? `鎽╁ぉ杞『鏃堕拡杞?${steps} 鏍煎悗锛屾渶涓婇潰鏄皝锛焋
+    : "鐜板湪璋佸潗鍦ㄦ渶涓婇潰锛?;
+  return {
+    title: "鐪嬫渶涓婇潰鐨勫骇浣?,
+    prompt,
+    mode: steps ? "rotate" : "observe",
+    targetSteps: steps,
+    choices: buildChoiceSet(answer, BASE_WHEEL),
+    answer,
+    hints: [
+      "鏈€涓婇潰鍙湁涓€涓綅缃€?,
+      steps ? `鍏堢畻娓呮椤烘椂閽堣浆浜?${steps} 鏍笺€俙 : "鍏堢湅鏈€椤朵笂鐨勫骇浣嶃€?,
+      "鏈€鍚庡啀鐪嬫渶涓婇潰鐨勫姩鐗╂槸璋併€?
+    ],
+    solutionSteps: [
+      stepText("鍏堝叧娉ㄦ渶涓婇潰鐨勫骇浣嶃€?, { slotIndex: 0 }),
+      steps
+        ? stepText(`鎽╁ぉ杞『鏃堕拡杞?${steps} 鏍煎悗锛屽啀鐪嬫渶涓婇潰銆俙, { slotIndex: 0, sceneSteps: steps })
+        : stepText("鐜板湪杩樻病鏈夎浆鍔紝鐩存帴鐪嬫渶涓婇潰銆?, { slotIndex: 0 }),
+      stepText(`鏈€涓婇潰鏄?{answer}锛屾墍浠ョ瓟妗堟槸${answer}銆俙, { slotIndex: 0, answer, sceneSteps: steps || undefined })
+    ]
+  };
+}
+
+function createCounterclockwiseQuestion(animal) {
+  const startSlot = animalSlot(animal);
+  const targetSlot = (startSlot + 7) % WHEEL_SLOT_COUNT;
+  const answer = BASE_WHEEL[targetSlot];
+  return {
+    title: "閫嗘椂閽堝墠涓€鏍?,
+    prompt: `鐜板湪${animal}鐨勯€嗘椂閽堜竴鏍兼槸璋侊紵`,
+    mode: "observe",
+    choices: buildChoiceSet(answer, BASE_WHEEL),
+    answer,
+    hints: [
+      `鍏堟壘鍒?{animal}鐨勪綅缃€俙,
+      "閫嗘椂閽堝氨鏄拰绠ご鐩稿弽鐨勬柟鍚戙€?,
+      "鍙線鍥為€€涓€鏍笺€?
+    ],
+    solutionSteps: [
+      stepText(`鍏堟壘鍒?{animal}鐨勪綅缃€俙, { slotIndex: startSlot }),
+      stepText("閫嗘椂閽堝氨鏄線鍥為€€涓€鏍笺€?, { slotIndex: targetSlot }),
+      stepText(`閭ｄ釜浣嶇疆鏄?{answer}锛屾墍浠ョ瓟妗堟槸${answer}銆俙, { slotIndex: targetSlot, answer })
+    ]
+  };
+}
+
+function createRotateSameHeightQuestion(mover, targetOwner, watchAnimal) {
+  const steps = rotationStepsForAnimalToSlot(mover, animalSlot(targetOwner));
+  const rotated = applyRotationSteps(BASE_WHEEL, steps);
+  const answer = computeSameHeightAnimal(rotated, watchAnimal);
+  return {
+    title: "杞埌鎸囧畾浣嶇疆鍚庢壘鍚岄珮",
+    prompt: `濡傛灉${mover}杞埌${targetOwner}鐨勪綅缃笂锛岄偅涔堣皝涓?{watchAnimal}涓€鏍烽珮锛焋,
+    mode: "rotate",
+    targetSteps: steps,
+    choices: buildChoiceSet(answer, BASE_WHEEL),
+    answer,
+    hints: [
+      `鍏堢湅${mover}瑕佽浆鍑犳牸鎵嶈兘鍒?{targetOwner}鍘熸潵鐨勪綅缃€俙,
+      "鍏ㄩ儴灏忓姩鐗╀細涓€璧烽『鏃堕拡杞浉鍚岀殑鏍兼暟銆?,
+      `杞畬浠ュ悗锛屽啀鍘绘壘鍜?{watchAnimal}涓€鏍烽珮鐨勪綅缃€俙
+    ],
+    solutionSteps: buildRotateSameHeightSteps(mover, targetOwner, watchAnimal, answer)
+  };
+}
+
+function createRotateOccupyQuestion(positionOwner, steps) {
+  const rotated = applyRotationSteps(BASE_WHEEL, steps);
+  const targetSlot = animalSlot(positionOwner);
+  const answer = rotated[targetSlot];
+  return {
+    title: "璋佹潵鍒拌繖涓綅缃?,
+    prompt: `鎽╁ぉ杞『鏃堕拡杞?${steps} 鏍煎悗锛岃皝鍧愬埌${positionOwner}鍘熸潵鐨勪綅缃笂锛焋,
+    mode: "rotate",
+    targetSteps: steps,
+    choices: buildChoiceSet(answer, BASE_WHEEL),
+    answer,
+    hints: [
+      `鍏堟壘鍒?{positionOwner}鍘熸潵鐨勪綅缃€俙,
+      `椤烘椂閽堜竴鍏辫浆 ${steps} 鏍笺€俙,
+      "杞畬鍚庣湅璋佹潵鍒颁簡杩欎釜搴т綅銆?
+    ],
+    solutionSteps: [
+      stepText(`鍏堣浣?{positionOwner}鍘熸潵鐨勪綅缃€俙, { slotIndex: targetSlot }),
+      stepText(`椤烘椂閽堣浆 ${steps} 鏍间互鍚庯紝鍐嶇湅杩欎釜浣嶇疆銆俙, { slotIndex: targetSlot, sceneSteps: steps }),
+      stepText(`鏉ュ埌杩欓噷鐨勬槸${answer}锛屾墍浠ョ瓟妗堟槸${answer}銆俙, { slotIndex: targetSlot, sceneSteps: steps, answer })
+    ]
+  };
+}
+
+function createRotateDestinationQuestion(animal, steps) {
+  const rotated = applyRotationSteps(BASE_WHEEL, steps);
+  const slotIndex = rotated.indexOf(animal);
+  const answer = BASE_WHEEL[slotIndex];
+  return {
+    title: "浼氳浆鍒拌皝鐨勪綅缃?,
+    prompt: `鎽╁ぉ杞『鏃堕拡杞?${steps} 鏍煎悗锛?{animal}浼氳浆鍒拌皝鍘熸潵鐨勪綅缃笂锛焋,
+    mode: "rotate",
+    targetSteps: steps,
+    choices: buildChoiceSet(answer, BASE_WHEEL),
+    answer,
+    hints: [
+      `鍏堟壘鍒?{animal}鐨勮捣鐐广€俙,
+      `鍐嶉『鏃堕拡鏁?${steps} 鏍笺€俙,
+      "鏈€鍚庣湅鍋滀笅鏉ョ殑閭ｄ釜搴т綅鍘熸潵鏄皝鐨勩€?
+    ],
+    solutionSteps: [
+      stepText(`鍏堟壘鍒?{animal}涓€寮€濮嬬殑浣嶇疆銆俙, { slotIndex: animalSlot(animal) }),
+      stepText(`椤烘椂閽堟暟 ${steps} 鏍笺€俙, { slotIndex, sceneSteps: steps }),
+      stepText(`${animal}鏈€鍚庡仠鍦?{answer}鍘熸潵鐨勪綅缃紝鎵€浠ョ瓟妗堟槸${answer}銆俙, { slotIndex, sceneSteps: steps, answer })
+    ]
+  };
+}
+
+function createQueueWatcherPositionQuestion(queueAnimals, targetAnimal, targetOwner, watchAnimal) {
+  const scene = simulateQueueUntilWithOrder(queueAnimals, targetAnimal, animalSlot(targetOwner));
+  const answerOwner = findAnimalOriginalPositionOwner(scene.wheel, watchAnimal);
+  const answer = `${answerOwner}鐨勪綅缃甡;
+  return {
+    title: "鎺掗槦鍚庣湅鍙︿竴涓綅缃?,
+    prompt: `濡傛灉鎺掗槦鐨?{targetAnimal}鍧愬埌${targetOwner}鐨勪綅缃笂锛岄偅涔?{watchAnimal}浼氬潗鍒板摢涓綅缃笂锛焋,
+    mode: "queue",
+    queueAnimals,
+    queueTargetAnimal: targetAnimal,
+    queueTargetSlot: animalSlot(targetOwner),
+    choices: buildChoiceSet(answer, buildPositionPool()),
+    answer,
+    hints: [
+      "鎺掗槦鐨勫皬鍔ㄧ墿鍏堜粠鏈€涓嬮潰涓婅溅銆?,
+      "姣忚浆涓€鏍硷紝涓嬩竴鍙帓闃熺殑灏忓姩鐗╀細琛ュ埌鏈€涓嬮潰銆?,
+      `绛?{targetAnimal}杞埌${targetOwner}鍘熸潵鐨勪綅缃椂锛屽啀鐪?{watchAnimal}銆俙
+    ],
+    solutionSteps: buildQueuePositionSteps(targetAnimal, targetOwner, watchAnimal, answerOwner)
+  };
+}
+
+function createQueueBoardQuestion(queueAnimals, boardAnimal) {
+  const answerOwner = computeBoardingOwner(queueAnimals, boardAnimal);
+  const answer = `${answerOwner}鐨勪綅缃甡;
+  return {
+    title: "鍒氫笂杞︽椂鍧愬摢鍎?,
+    prompt: `鎺掗槦鐨?{boardAnimal}鍒氬潗涓婃懇澶╄疆鏃讹紝瀹冨潗鍒板摢涓綅缃笂锛焋,
+    mode: "queue",
+    queueAnimals,
+    queueTargetAnimal: boardAnimal,
+    queueTargetBoardingOnly: true,
+    choices: buildChoiceSet(answer, buildPositionPool()),
+    answer,
+    hints: [
+      "鍏堢湅闃熶紞椤哄簭锛岃皝鍏堜笂杞﹁皝鍚庝笂杞︺€?,
+      "姣忔涓婅溅閮藉潗鍒版渶涓嬮潰鐨勪綅缃€?,
+      `杞埌${boardAnimal}涓婅溅鏃讹紝鐪嬬湅鏈€涓嬮潰鍘熸潵鏄皝鐨勪綅缃€俙
+    ],
+    solutionSteps: [
+      stepText("鍏堟寜鎺掗槦椤哄簭璁╁墠闈㈢殑灏忓姩鐗╀笂杞︺€?),
+      stepText(`杞埌${boardAnimal}鏃讹紝瀹冧細鍧愬埌鏈€涓嬮潰銆俙, { slotIndex: 4, queueAnimal: boardAnimal }),
+      stepText(`鏈€涓嬮潰鍘熸潵鏄?{answerOwner}鐨勪綅缃紝鎵€浠ョ瓟妗堟槸${answerOwner}鐨勪綅缃€俙, {
+        slotIndex: 4,
+        queueAnimal: boardAnimal,
+        answer
+      })
+    ]
+  };
+}
+
+function createQueueTopQuestion(queueAnimals, targetAnimal, targetOwner) {
+  const scene = simulateQueueUntilWithOrder(queueAnimals, targetAnimal, animalSlot(targetOwner));
+  const answer = scene.wheel[0];
+  return {
+    title: "鎺掗槦鍚庣湅鏈€涓婇潰",
+    prompt: `濡傛灉鎺掗槦鐨?{targetAnimal}鍧愬埌${targetOwner}鐨勪綅缃笂锛岄偅涔堟渶涓婇潰鏄皝锛焋,
+    mode: "queue",
+    queueAnimals,
+    queueTargetAnimal: targetAnimal,
+    queueTargetSlot: animalSlot(targetOwner),
+    choices: buildChoiceSet(answer, [...BASE_WHEEL, ...queueAnimals]),
+    answer,
+    hints: [
+      "鍏堣鎺掗槦鐨勫皬鍔ㄧ墿鎸夐『搴忎笂杞︺€?,
+      `绛?{targetAnimal}杞埌${targetOwner}鍘熸潵鐨勪綅缃€俙,
+      "鍐嶅幓鐪嬫渶涓婇潰鐨勯偅涓骇浣嶃€?
+    ],
+    solutionSteps: [
+      stepText(`鍏堣${targetAnimal}鎸夐槦浼嶉『搴忎笂杞︺€俙, { queueAnimal: targetAnimal }),
+      stepText(`缁х画椤烘椂閽堣浆锛岀洿鍒?{targetAnimal}鏉ュ埌${targetOwner}鍘熸潵鐨勪綅缃€俙, {
+        sceneQueueTarget: { animal: targetAnimal, slot: animalSlot(targetOwner) }
+      }),
+      stepText(`杩欐椂鏈€涓婇潰鏄?{answer}锛屾墍浠ョ瓟妗堟槸${answer}銆俙, {
+        sceneQueueTarget: { animal: targetAnimal, slot: animalSlot(targetOwner) },
+        slotIndex: 0,
+        answer
+      })
+    ]
+  };
+}
+
+function levelsByType(typeId) {
+  return LEVELS.filter((level) => level.typeId === typeId);
+}
+
+function buildChoiceSet(answer, pool) {
+  const choices = [answer];
+  const startIndex = Math.max(0, pool.indexOf(answer));
+  for (let offset = 1; offset < pool.length && choices.length < 4; offset += 1) {
+    const candidate = pool[(startIndex + offset) % pool.length];
+    if (!choices.includes(candidate)) {
+      choices.push(candidate);
+    }
+  }
+  const shift = startIndex % choices.length;
+  return [...choices.slice(shift), ...choices.slice(0, shift)];
+}
+
+function buildPositionPool() {
+  return BASE_WHEEL.map((animal) => `${animal}鐨勪綅缃甡);
+}
+
+function computeSameHeightAnimal(wheel, animal) {
+  const slotIndex = wheel.indexOf(animal);
+  const targetSlot = SAME_HEIGHT_SLOT[slotIndex];
+  return targetSlot === undefined ? "" : wheel[targetSlot];
+}
+
+function findAnimalOriginalPositionOwner(wheel, animal) {
+  const slotIndex = wheel.indexOf(animal);
+  return slotIndex === -1 ? "" : BASE_WHEEL[slotIndex];
+}
+
+function simulateQueueUntilWithOrder(queueAnimals, targetAnimal, targetSlot) {
+  const level = {
+    mode: "queue",
+    queueAnimals
+  };
+  const scene = createSceneForLevel(level);
+  let guard = 0;
+  while (scene.wheel[targetSlot] !== targetAnimal && guard < 24) {
+    rotateQueueScene(scene);
+    guard += 1;
+  }
+  return scene;
+}
+
+function computeBoardingOwner(queueAnimals, boardAnimal) {
+  const scene = {
+    wheel: [...BASE_WHEEL],
+    queue: [...queueAnimals],
+    boarded: [],
+    rotationCount: 0
+  };
+  let guard = 0;
+  while (scene.queue.length && guard < 24) {
+    const nextAnimal = scene.queue[0];
+    const owner = scene.wheel[4];
+    boardNextQueueAnimal(scene);
+    if (nextAnimal === boardAnimal) {
+      return owner;
+    }
+    scene.wheel = rotateWheelClockwise(scene.wheel);
+    scene.rotationCount += 1;
+    guard += 1;
+  }
+  return BASE_WHEEL[4];
+}
+

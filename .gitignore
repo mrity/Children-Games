@@ -1,0 +1,4 @@
+.omc/
+.lan-server.pid
+.lan-server.stdout.log
+.lan-server.stderr.log
