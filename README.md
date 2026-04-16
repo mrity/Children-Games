@@ -10,7 +10,7 @@
 </div>
 
 <p align="center">
-  <img src="./pic.png" alt="摩天轮逻辑题原始题图" width="520">
+  <img src="./docs/game-screen-preview.png" alt="摩天轮乐园游戏页面截图" width="900">
 </p>
 
 一个基于“小学生摩天轮逻辑题”改编的儿童网页启蒙游戏。项目使用纯 `HTML + CSS + JavaScript` 开发，不依赖打包工具，双击 `index.html` 就能打开，也可以放到局域网或 GitHub Pages 上直接给孩子使用。
@@ -158,3 +158,7 @@ https://mrity.github.io/Children-Games/
 - “如果狐狸转到小猴子的位置上，那么谁与小松鼠一样高？”
 - “如果兔子的位置转到小熊的位置上，那么谁与熊猫一样高？”
 - “如果排队的小老鼠坐到小熊的位置上，那么小猪会坐到哪个位置上？”
+
+<p align="center">
+  <img src="./pic.png" alt="摩天轮逻辑题原始题图" width="520">
+</p>
