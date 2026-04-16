@@ -553,6 +553,347 @@ export class FerrisWheelGame {
   }
 
   /**
+   * 重置关卡状态
+   */
+  _resetLevelState() {
+    this._clearPlayback();
+    this._state.selectedAnswer = '';
+    this._state.wrongAttempts = 0;
+    this._state.hintsShown = 0;
+    this._state.solutionViewed = false;
+    this._state.rotateDuration = Number(this._dom.rotateSpeed.value) || ROTATE_MS;
+    this._hideAnswerStatusBadge();
+    this._setFeedback('选一个你认为正确的答案吧。');
+    this._renderHintPanel();
+  }
+
+  /**
+   * 重置当前关卡场景
+   */
+  _resetCurrentLevelScene() {
+    if (this._state.isAutoAdvancing) {
+      return;
+    }
+    this._clearPlayback();
+    this._state.scene = this._createSceneForLevel(this._currentLevel());
+    this._setCoach('观察中', COACH_DEFAULT);
+    this._setFeedback('已经回到最开始的样子，可以重新观察啦。');
+    this._renderScene();
+  }
+
+  /**
+   * 提交答案
+   * @param {string} answer - 用户选择的答案
+   */
+  _submitAnswer(answer) {
+    if (this._state.isPlayingSolution || this._state.isRotating || this._state.isAutoAdvancing) {
+      return;
+    }
+
+    const level = this._currentLevel();
+    this._state.selectedAnswer = answer;
+    this._state.progress.stats.totalAttempts += 1;
+
+    const record = getLevelRecord(this._state.progress, level.id);
+    record.attempts += 1;
+    record.lastPlayedAt = new Date().toISOString();
+
+    const buttons = [...this._dom.answerGrid.querySelectorAll('.answer-button')];
+    buttons.forEach((button) => {
+      button.classList.remove('is-correct', 'is-wrong');
+      if (button.dataset.answer === answer) {
+        button.classList.add(answer === level.answer ? 'is-correct' : 'is-wrong');
+      }
+      if (button.dataset.answer === level.answer && answer === level.answer) {
+        button.classList.add('is-correct');
+      }
+    });
+
+    if (answer === level.answer) {
+      SoundManager.play('correct');
+      const stars = this._computeStars();
+      this._finishLevel(level.id, stars);
+      this._state.isAutoAdvancing = true;
+      this._setCoach('答对啦', `做得对，答案是${level.answer}。`);
+      this._setFeedback(`答对了。${this._buildCorrectReason(level)}`);
+      this._showAnswerStatusBadge(stars);
+      this._setMotionDisabled(true);
+      this._setAnswerButtonsDisabled(true);
+      this._queueAutoAdvance();
+    } else {
+      SoundManager.play('wrong');
+      this._state.wrongAttempts += 1;
+      this._hideAnswerStatusBadge();
+      this._saveProgress();
+      this._setCoach('再想想', '这次不对，先回到题目里找关键位置。');
+      this._setFeedback('还不对哦。先看看题目里是谁在移动，再找最后要看的位置。');
+    }
+  }
+
+  /**
+   * 显示提示
+   */
+  _revealHint() {
+    if (this._state.isAutoAdvancing) {
+      return;
+    }
+
+    const level = this._currentLevel();
+    if (this._state.hintsShown >= level.hints.length) {
+      this._setFeedback('提示已经全部看完啦，试着自己想一想。');
+      return;
+    }
+
+    SoundManager.play('hint');
+    this._state.hintsShown += 1;
+    this._state.progress.stats.hintsUsed += 1;
+    getLevelRecord(this._state.progress, level.id).hintsUsed += 1;
+    this._saveProgress();
+    this._renderHintPanel();
+    this._setCoach('提示中', level.hints[this._state.hintsShown - 1]);
+  }
+
+  /**
+   * 播放讲解
+   */
+  _playSolution() {
+    if (this._state.isAutoAdvancing) {
+      return;
+    }
+
+    const level = this._currentLevel();
+    this._clearPlayback();
+    this._state.solutionViewed = true;
+    this._state.progress.stats.solutionsViewed += 1;
+    getLevelRecord(this._state.progress, level.id).solutionViewed = true;
+    this._saveProgress();
+    this._setFeedback('正在回放思路，请跟着高亮位置一起看。');
+    this._setMotionDisabled(true);
+    this._state.isPlayingSolution = true;
+
+    const steps = level.solutionSteps || [];
+    let currentStep = 0;
+
+    const showStep = () => {
+      if (currentStep >= steps.length) {
+        this._state.isPlayingSolution = false;
+        this._setMotionDisabled(false);
+        this._setCoach('讲解完成', '讲解看完了，现在可以自己试着回答。');
+        return;
+      }
+
+      const step = steps[currentStep];
+      this._applySolutionStep(step, level);
+      currentStep += 1;
+      this._state.playbackTimer = window.setTimeout(showStep, PLAYBACK_STEP_DELAY_MS);
+    };
+
+    showStep();
+  }
+
+  /**
+   * 应用讲解步骤
+   * @param {Object} step - 讲解步骤
+   * @param {Object} level - 关卡对象
+   */
+  _applySolutionStep(step, level) {
+    let previewScene = cloneScene(this._createSceneForLevel(level));
+
+    if (typeof step.sceneSteps === 'number') {
+      if (level.mode === 'queue') {
+        for (let index = 0; index < step.sceneSteps; index += 1) {
+          rotateQueueScene(previewScene);
+        }
+      } else {
+        previewScene.wheel = applyRotationSteps(previewScene.wheel, step.sceneSteps);
+        previewScene.rotationCount = step.sceneSteps;
+      }
+    }
+
+    if (step.sceneQueueTarget) {
+      previewScene = simulateQueueUntilWithOrder(
+        level.queueAnimals || QUEUE_ANIMALS,
+        step.sceneQueueTarget.animal,
+        step.sceneQueueTarget.slot,
+        this._createSceneForLevel.bind(this)
+      );
+    }
+
+    this._state.scene = previewScene;
+    this._renderScene();
+    this._clearHighlights();
+
+    if (typeof step.slotIndex === 'number') {
+      this._highlightSlot(step.slotIndex, step.answer ? 'is-answer' : 'is-highlighted');
+    }
+    if (step.queueAnimal) {
+      this._highlightQueueAnimal(step.queueAnimal);
+      this._highlightCabinAnimal(step.queueAnimal, step.answer ? 'is-answer' : 'is-highlighted');
+    }
+    if (step.answer) {
+      this._highlightAnswerButton(step.answer);
+    }
+
+    this._setCoach('讲解中', step.text);
+  }
+
+  /**
+   * 推进场景(转动摩天轮)
+   */
+  _advanceScene() {
+    if (this._state.isRotating || this._state.isPlayingSolution || this._state.isAutoAdvancing) {
+      return;
+    }
+
+    this._clearPlayback();
+    this._state.rotateDuration = Number(this._dom.rotateSpeed.value) || ROTATE_MS;
+
+    const direction = this._dom.rotateDirection.value;
+    const circles = Number(this._dom.rotateCircles.value) || 0;
+    const slots = Number(this._dom.rotateSteps.value) || 0;
+    let steps = circles * WHEEL_SLOT_COUNT + slots;
+
+    if (!steps) {
+      steps = 1;
+      this._dom.rotateSteps.value = '1';
+      this._setFeedback('当前是 0 圈 0 格，系统先按 1 格帮你转动。');
+    }
+
+    const level = this._currentLevel();
+    let finishedSteps = 0;
+
+    this._state.isRotating = true;
+    this._setMotionDisabled(true);
+
+    const runOneStep = () => {
+      SoundManager.play('rotate');
+      animateWheelTurn(direction, () => {
+        applyRotationByDirection(level, this._state.scene, direction);
+        finishedSteps += 1;
+        this._renderScene();
+        this._setCoach('转动中', buildRotationMessage(level.mode, direction, finishedSteps, steps));
+        if (finishedSteps >= steps) {
+          this._state.isRotating = false;
+          this._setMotionDisabled(false);
+          return;
+        }
+        this._state.rotationTimer = window.setTimeout(runOneStep, ROTATION_STEP_INTERVAL_MS);
+      }, this._state, this._dom);
+    };
+
+    runOneStep();
+  }
+
+  /**
+   * 渲染所有页面
+   */
+  _renderAll() {
+    this._renderNav();
+    this._renderMap();
+    this._renderGame();
+    this._renderProgress();
+  }
+
+  /**
+   * 渲染导航栏
+   */
+  _renderNav() {
+    this._dom.navButtons.forEach((button) => {
+      const isActive = button.dataset.screen === this._state.currentScreen;
+      button.classList.toggle('is-active', isActive);
+    });
+  }
+
+  /**
+   * 渲染地图页
+   */
+  _renderMap() {
+    const completed = this._state.progress.completedLevelIds.length;
+    const totalStars = LEVELS.reduce((sum, level) => sum + getBestStars(this._state.progress, level.id), 0);
+    const unlocked = getUnlockedLevelCount(this._state.progress, LEVELS.length);
+
+    this._dom.mapSummary.innerHTML = [
+      this._summaryCardHtml('已完成', `${completed} / ${LEVELS.length}`),
+      this._summaryCardHtml('已解锁', `${unlocked} 题`),
+      this._summaryCardHtml('星星', `${totalStars} 颗`)
+    ].join('');
+
+    this._dom.zoneList.innerHTML = ZONES.map((zone) => this._renderZoneCard(zone)).join('');
+    this._dom.zoneList.querySelectorAll('.question-chip').forEach((button) => {
+      button.addEventListener('click', () => {
+        const level = this._levelById(button.dataset.levelId);
+        if (level && isLevelUnlocked(this._state.progress, level.number, LEVELS.length)) {
+          this._startLevel(level.id);
+        }
+      });
+    });
+  }
+
+  /**
+   * 渲染摩天轮场景
+   */
+  _renderScene() {
+    if (!this._state.scene) {
+      return;
+    }
+
+    const slots = getSlotLayout(this._dom.wheelBody);
+    this._dom.cabinLayer.style.setProperty('--rotate-duration', `${this._state.rotateDuration}ms`);
+    this._dom.wheelBody.style.transform = 'rotate(0deg)';
+    this._dom.cabinLayer.innerHTML = this._state.scene.wheel
+      .map((animal, slotIndex) => this._renderCabin(animal, slotIndex, slots[slotIndex]))
+      .join('');
+    this._dom.queueLine.innerHTML = this._state.scene.queue
+      .map((animal) => this._renderQueueAnimal(animal))
+      .join('');
+    this._dom.queueTip.textContent = this._state.scene.queue.length ? '等候中的小动物' : '排队区暂时空了';
+  }
+
+  /**
+   * 渲染座舱
+   * @param {string} animal - 动物名称
+   * @param {number} slotIndex - 座位索引
+   * @param {Object} slot - 座位坐标
+   * @returns {string} HTML 字符串
+   */
+  _renderCabin(animal, slotIndex, slot) {
+    const style = ANIMAL_STYLES[animal] || { color: '#ffffff', short: animal, avatar: '🐾' };
+    return `
+      <div class="animal-cabin" data-slot-index="${slotIndex}" data-animal="${animal}" style="--slot-x:${slot.x}px; --slot-y:${slot.y}px; background:${style.color};">
+        <div class="animal-cabin-inner">
+          <span class="animal-avatar" aria-hidden="true">${style.avatar}</span>
+          <span class="animal-name">${animal}</span>
+        </div>
+      </div>
+    `;
+  }
+
+  /**
+   * 渲染排队动物
+   * @param {string} animal - 动物名称
+   * @returns {string} HTML 字符串
+   */
+  _renderQueueAnimal(animal) {
+    const style = ANIMAL_STYLES[animal] || { color: '#ffffff', avatar: '🐾' };
+    return `
+      <div class="queue-animal" data-queue-animal="${animal}" style="background:${style.color};">
+        <span class="queue-avatar" aria-hidden="true">${style.avatar}</span>
+        <span class="queue-name">${animal}</span>
+      </div>
+    `;
+  }
+
+  /**
+   * 渲染摩天轮辐条
+   */
+  _renderWheelSpokes() {
+    this._dom.wheelSpokes.innerHTML = Array.from({ length: WHEEL_SLOT_COUNT }, (_, index) => {
+      const angle = index * 45;
+      return `<div class="wheel-spoke" style="transform: rotate(${angle}deg);"></div>`;
+    }).join('');
+  }
+
+  /**
    * 挂载游戏到容器
    * @param {HTMLElement} container - 游戏容器元素
    */
@@ -573,6 +914,9 @@ export class FerrisWheelGame {
 
     // 绑定事件
     this._bindEvents();
+
+    // 渲染摩天轮辐条
+    this._renderWheelSpokes();
 
     // 初始渲染
     this._renderAll();
