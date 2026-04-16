@@ -167,6 +167,16 @@ https://mrity.github.io/Children-Games/
 - 📝 完善代码文档和注释
 - 🏗️ 建立清晰的模块化架构，为后续开发打下基础
 
+### 🚀 即将到来（多游戏集合架构）
+
+项目正在准备扩展为多个益智游戏的集合平台：
+- 📋 已完成架构设计和迁移计划
+- 🗂️ 已创建新的目录结构（platform/ 和 games/）
+- 🔄 已准备数据迁移脚本，确保进度不丢失
+- 🌳 已创建开发分支 `feature/multi-game-architecture`
+
+详见 [迁移计划文档](docs/MIGRATION_PLAN.md)
+
 ## 原始题目
 
 题目文本见 `question.md`，核心示例包括：
