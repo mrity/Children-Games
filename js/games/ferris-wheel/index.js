@@ -894,6 +894,509 @@ export class FerrisWheelGame {
   }
 
   /**
+   * 渲染游戏页
+   */
+  _renderGame() {
+    const level = this._currentLevel();
+    if (!level) {
+      return;
+    }
+
+    if (!this._state.scene) {
+      this._state.scene = this._createSceneForLevel(level);
+    }
+
+    this._hideAnswerStatusBadge();
+    this._dom.gameZoneLabel.textContent = `${level.zoneName} · 第 ${level.typeNumber} 类题型`;
+    this._dom.gameTitle.textContent = `${level.typeTitle} · 第 ${level.questionNumber} 题`;
+    this._dom.gameLevelBadge.textContent = `${level.number} / ${LEVELS.length}`;
+    this._dom.challengeZoneText.textContent = `第 ${level.typeNumber} 类 · ${level.zoneName}`;
+    this._dom.challengeTitle.textContent = level.typeTitle;
+    this._dom.challengePrompt.textContent = `第 ${level.questionNumber} 题：${level.prompt}`;
+
+    this._renderAnswers();
+    this._renderScene();
+    this._renderHintPanel();
+    this._renderMiniProgress();
+    this._setCoach('观察中', COACH_DEFAULT);
+  }
+
+  /**
+   * 渲染答案按钮
+   */
+  _renderAnswers() {
+    const level = this._currentLevel();
+    this._dom.answerGrid.innerHTML = level.choices.map((choice) => `
+      <button class="answer-button" data-answer="${choice}">${choice}</button>
+    `).join('');
+    this._setAnswerButtonsDisabled(this._state.isAutoAdvancing);
+  }
+
+  /**
+   * 渲染提示面板
+   */
+  _renderHintPanel() {
+    const level = this._currentLevel();
+    this._dom.hintCounter.textContent = `提示 ${this._state.hintsShown} / ${level.hints.length}`;
+    if (!this._state.hintsShown) {
+      this._dom.hintBox.textContent = '需要的时候点一下"看提示"，系统会一步一步提醒你。';
+      return;
+    }
+    this._dom.hintBox.innerHTML = `<ul>${level.hints.slice(0, this._state.hintsShown).map((hint) => `<li>${hint}</li>`).join('')}</ul>`;
+  }
+
+  /**
+   * 渲染小进度条
+   */
+  _renderMiniProgress() {
+    const currentTypeLevels = LEVELS.filter((level) => level.typeId === this._currentLevel().typeId);
+    const completed = currentTypeLevels.filter((level) => isLevelComplete(this._state.progress, level.id)).length;
+    this._dom.miniProgressText.textContent = `${completed} / ${currentTypeLevels.length}`;
+    this._dom.miniProgressGrid.innerHTML = currentTypeLevels.map((level) => {
+      const classNames = ['mini-level-dot'];
+      if (level.id === this._state.currentLevelId) {
+        classNames.push('is-current');
+      } else if (isLevelComplete(this._state.progress, level.id)) {
+        classNames.push('is-done');
+      } else if (!isLevelUnlocked(this._state.progress, level.number, LEVELS.length)) {
+        classNames.push('is-locked');
+      }
+      return `<div class="${classNames.join(' ')}">${level.questionNumber}</div>`;
+    }).join('');
+  }
+
+  /**
+   * 渲染进度页
+   */
+  _renderProgress() {
+    const totalStars = LEVELS.reduce((sum, level) => sum + getBestStars(this._state.progress, level.id), 0);
+    this._dom.progressStats.innerHTML = [
+      this._progressCardHtml('闯关完成', `${this._state.progress.completedLevelIds.length} / ${LEVELS.length}`),
+      this._progressCardHtml('收集星星', `${totalStars} 颗`),
+      this._progressCardHtml('用了提示', `${this._state.progress.stats.hintsUsed} 次`)
+    ].join('');
+
+    this._dom.recordList.innerHTML = ZONES.map((zone) => this._renderRecordCard(zone)).join('');
+  }
+
+  // ========== 辅助渲染方法 ==========
+
+  /**
+   * 渲染区域卡片
+   */
+  _renderZoneCard(zone) {
+    const zoneLevels = LEVELS.filter((level) => level.zoneId === zone.id);
+    const zoneTypes = QUESTION_TYPES.filter((type) => type.zoneId === zone.id);
+    const completedCount = zoneLevels.filter((level) => isLevelComplete(this._state.progress, level.id)).length;
+
+    return `
+      <article class="zone-card">
+        <div class="zone-card-header">
+          <div>
+            <h3>${zone.name}</h3>
+            <p>${zone.subtitle}</p>
+          </div>
+          <span class="zone-theme-band" style="background:${zone.color};">${zone.band}</span>
+        </div>
+        <div class="type-card-grid">
+          ${zoneTypes.map((type) => this._renderTypeCard(type)).join('')}
+        </div>
+        <p>本区域已完成 ${completedCount} / ${zoneLevels.length} 题。</p>
+      </article>
+    `;
+  }
+
+  /**
+   * 渲染题型卡片
+   */
+  _renderTypeCard(type) {
+    const typeLevels = LEVELS.filter((level) => level.typeId === type.id);
+    const completedCount = typeLevels.filter((level) => isLevelComplete(this._state.progress, level.id)).length;
+
+    return `
+      <div class="type-card">
+        <div class="type-card-header">
+          <strong>第 ${type.typeNumber} 类</strong>
+          <span>${completedCount} / ${typeLevels.length}</span>
+        </div>
+        <h4>${type.title}</h4>
+        <p>${type.summary}</p>
+        <div class="question-chip-row">
+          ${typeLevels.map((level) => this._renderQuestionChip(level)).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  /**
+   * 渲染关卡芯片
+   */
+  _renderQuestionChip(level) {
+    const unlocked = isLevelUnlocked(this._state.progress, level.number, LEVELS.length);
+    const done = isLevelComplete(this._state.progress, level.id);
+    const classNames = ['question-chip'];
+
+    if (!unlocked) {
+      classNames.push('is-locked');
+    }
+    if (done) {
+      classNames.push('is-done');
+    }
+    if (level.id === this._state.currentLevelId && this._state.currentScreen === 'game') {
+      classNames.push('is-current');
+    }
+
+    return `
+      <button class="${classNames.join(' ')}" data-level-id="${level.id}" ${unlocked ? '' : 'disabled'}>
+        ${level.questionNumber}
+      </button>
+    `;
+  }
+
+  /**
+   * 渲染记录卡片
+   */
+  _renderRecordCard(zone) {
+    const zoneTypes = QUESTION_TYPES.filter((type) => type.zoneId === zone.id);
+    return `
+      <article class="record-card">
+        <div class="record-card-header">
+          <div>
+            <h3>${zone.name}</h3>
+            <p>${zone.subtitle}</p>
+          </div>
+        </div>
+        <div class="type-card-grid">
+          ${zoneTypes.map((type) => this._renderRecordTypeCard(type)).join('')}
+        </div>
+      </article>
+    `;
+  }
+
+  /**
+   * 渲染记录题型卡片
+   */
+  _renderRecordTypeCard(type) {
+    const typeLevels = LEVELS.filter((level) => level.typeId === type.id);
+    const completedCount = typeLevels.filter((level) => isLevelComplete(this._state.progress, level.id)).length;
+    const starCount = typeLevels.reduce((sum, level) => sum + getBestStars(this._state.progress, level.id), 0);
+
+    return `
+      <div class="record-chip">
+        <strong>第 ${type.typeNumber} 类</strong>
+        <div>${type.title}</div>
+        <div>已完成 ${completedCount} / ${typeLevels.length} 题</div>
+        <div>累计 ${starCount} 颗星</div>
+      </div>
+    `;
+  }
+
+  /**
+   * 生成摘要卡片 HTML
+   */
+  _summaryCardHtml(label, value) {
+    return `<div class="summary-card"><strong>${value}</strong><p>${label}</p></div>`;
+  }
+
+  /**
+   * 生成进度卡片 HTML
+   */
+  _progressCardHtml(label, value) {
+    return `<div class="progress-card"><strong>${value}</strong><p>${label}</p></div>`;
+  }
+
+  // ========== 辅助方法 ==========
+
+  /**
+   * 页面导航
+   */
+  _navigateTo(screenName) {
+    if (screenName !== 'game') {
+      this._clearPlayback();
+    }
+
+    this._state.currentScreen = screenName;
+    document.body.classList.toggle('is-game-screen', screenName === 'game');
+
+    Object.values(this._dom.screens).forEach((screen) => {
+      screen.classList.toggle('is-active', screen.id === `screen-${screenName}`);
+    });
+
+    this._renderNav();
+
+    if (screenName === 'map') {
+      this._renderMap();
+    }
+    if (screenName === 'progress') {
+      this._renderProgress();
+    }
+    if (screenName === 'game') {
+      this._renderGame();
+    }
+  }
+
+  /**
+   * 清除播放状态
+   */
+  _clearPlayback() {
+    if (this._state.playbackTimer) {
+      window.clearTimeout(this._state.playbackTimer);
+      this._state.playbackTimer = 0;
+    }
+    if (this._state.rotationTimer) {
+      window.clearTimeout(this._state.rotationTimer);
+      this._state.rotationTimer = 0;
+    }
+    if (this._state.autoAdvanceTimer) {
+      window.clearTimeout(this._state.autoAdvanceTimer);
+      this._state.autoAdvanceTimer = 0;
+    }
+    if (this._state.animationFrameId) {
+      window.cancelAnimationFrame(this._state.animationFrameId);
+      this._state.animationFrameId = 0;
+    }
+    if (this._state.wheelAnimation) {
+      try {
+        this._state.wheelAnimation.cancel();
+      } catch (error) {
+        // Ignore browser-specific animation cancel issues
+      }
+      this._state.wheelAnimation = null;
+    }
+
+    if (this._dom.wheelBody) {
+      this._dom.wheelBody.style.transform = 'rotate(0deg)';
+    }
+
+    this._state.isPlayingSolution = false;
+    this._state.isRotating = false;
+    this._state.isAutoAdvancing = false;
+    this._setMotionDisabled(false);
+    this._setAnswerButtonsDisabled(false);
+    this._hideAnswerStatusBadge();
+    this._clearHighlights();
+  }
+
+  /**
+   * 设置反馈文本
+   */
+  _setFeedback(text) {
+    this._dom.feedbackBox.textContent = text;
+  }
+
+  /**
+   * 设置教练提示
+   */
+  _setCoach(status, text) {
+    this._dom.coachStatus.textContent = status;
+    this._dom.coachBubble.textContent = text;
+  }
+
+  /**
+   * 显示答案状态徽章
+   */
+  _showAnswerStatusBadge(stars) {
+    this._dom.answerStatusBadge.innerHTML = `
+      <span class="answer-status-text">答对啦</span>
+      <span class="answer-status-stars" aria-hidden="true">
+        ${Array.from({ length: 3 }, (_, index) => {
+          const active = index < stars;
+          return `<span class="star-token${active ? '' : ' is-off'}">★</span>`;
+        }).join('')}
+      </span>
+    `;
+    this._dom.answerStatusBadge.setAttribute('aria-label', `回答正确，本题获得${stars}颗星。`);
+    this._dom.answerStatusBadge.classList.remove('is-hidden');
+  }
+
+  /**
+   * 隐藏答案状态徽章
+   */
+  _hideAnswerStatusBadge() {
+    this._dom.answerStatusBadge.innerHTML = '';
+    this._dom.answerStatusBadge.classList.add('is-hidden');
+  }
+
+  /**
+   * 设置答案按钮禁用状态
+   */
+  _setAnswerButtonsDisabled(disabled) {
+    this._dom.answerGrid.querySelectorAll('.answer-button').forEach((button) => {
+      button.disabled = disabled;
+    });
+  }
+
+  /**
+   * 设置操作按钮禁用状态
+   */
+  _setMotionDisabled(disabled) {
+    this._dom.rotateNowButton.disabled = disabled;
+    this._dom.rotateDirection.disabled = disabled;
+    this._dom.rotateSpeed.disabled = disabled;
+    this._dom.rotateCircles.disabled = disabled;
+    this._dom.rotateSteps.disabled = disabled;
+    this._dom.resetSceneButton.disabled = disabled;
+    this._dom.hintButton.disabled = disabled;
+    this._dom.solutionButton.disabled = disabled;
+  }
+
+  /**
+   * 队列自动推进
+   */
+  _queueAutoAdvance() {
+    if (this._state.autoAdvanceTimer) {
+      window.clearTimeout(this._state.autoAdvanceTimer);
+    }
+    this._state.autoAdvanceTimer = window.setTimeout(() => {
+      this._state.autoAdvanceTimer = 0;
+      this._state.isAutoAdvancing = false;
+      this._startNextLevel();
+    }, AUTO_ADVANCE_DELAY_MS);
+  }
+
+  /**
+   * 开始下一关
+   */
+  _startNextLevel() {
+    const currentLevel = this._currentLevel();
+    const nextLevel = LEVELS[currentLevel.index + 1];
+    if (nextLevel) {
+      this._startLevel(nextLevel.id);
+    } else {
+      this._hideResultOverlay();
+      this._navigateTo('map');
+    }
+  }
+
+  /**
+   * 清除高亮
+   */
+  _clearHighlights() {
+    this._dom.cabinLayer.querySelectorAll('.animal-cabin').forEach((item) => {
+      item.classList.remove('is-highlighted', 'is-answer', 'is-faded');
+    });
+    this._dom.queueLine.querySelectorAll('.queue-animal').forEach((item) => {
+      item.classList.remove('is-highlighted', 'is-boarded');
+    });
+    this._dom.answerGrid.querySelectorAll('.answer-button').forEach((item) => {
+      item.classList.remove('is-correct', 'is-wrong');
+    });
+  }
+
+  /**
+   * 高亮座位
+   */
+  _highlightSlot(slotIndex, className) {
+    const node = this._dom.cabinLayer.querySelector(`[data-slot-index="${slotIndex}"]`);
+    if (node) {
+      node.classList.add(className);
+    }
+  }
+
+  /**
+   * 高亮排队动物
+   */
+  _highlightQueueAnimal(animal) {
+    const queueNode = [...this._dom.queueLine.querySelectorAll('.queue-animal')]
+      .find((node) => node.dataset.queueAnimal === animal);
+    if (queueNode) {
+      queueNode.classList.add('is-highlighted');
+    }
+  }
+
+  /**
+   * 高亮座舱动物
+   */
+  _highlightCabinAnimal(animal, className) {
+    const cabinNode = this._dom.cabinLayer.querySelector(`[data-animal="${animal}"]`);
+    if (cabinNode) {
+      cabinNode.classList.add(className);
+    }
+  }
+
+  /**
+   * 高亮答案按钮
+   */
+  _highlightAnswerButton(answer) {
+    const answerNode = this._dom.answerGrid.querySelector(`[data-answer="${answer}"]`);
+    if (answerNode) {
+      answerNode.classList.add('is-correct');
+    }
+  }
+
+  /**
+   * 显示结果弹窗
+   */
+  _showResultOverlay() {
+    this._dom.resultOverlay.classList.remove('hidden');
+  }
+
+  /**
+   * 隐藏结果弹窗
+   */
+  _hideResultOverlay() {
+    this._dom.resultOverlay.classList.add('hidden');
+  }
+
+  /**
+   * 计算星级
+   */
+  _computeStars() {
+    if (this._state.wrongAttempts === 0) {
+      return STARS_PERFECT;
+    }
+    if (this._state.wrongAttempts === 1) {
+      return STARS_GOOD;
+    }
+    return STARS_PASS;
+  }
+
+  /**
+   * 完成关卡
+   */
+  _finishLevel(levelId, stars) {
+    if (!this._state.progress.completedLevelIds.includes(levelId)) {
+      this._state.progress.completedLevelIds.push(levelId);
+    }
+    const currentBest = getBestStars(this._state.progress, levelId);
+    if (stars > currentBest) {
+      this._state.progress.starsByLevel[levelId] = stars;
+    }
+    this._saveProgress();
+    this._renderAll();
+  }
+
+  /**
+   * 构建正确答案原因
+   */
+  _buildCorrectReason(level) {
+    if (level.mode === 'queue') {
+      return '排队的小动物会按顺序上车，每转一格就有一只新的小动物坐到最下面。';
+    }
+    return '所有小动物会一起转动，保持相对位置不变。';
+  }
+
+  /**
+   * 导出进度
+   */
+  _exportProgress() {
+    exportProgress(this._state.progress);
+  }
+
+  /**
+   * 导入进度
+   */
+  _importProgress(file) {
+    importProgress(file, LEVELS, (normalized, successMessage) => {
+      this._state.progress = normalized;
+      this._saveProgress();
+      this._renderAll();
+      this._dom.importProgressFile.value = '';
+      alert(successMessage);
+    });
+  }
+
+  /**
    * 挂载游戏到容器
    * @param {HTMLElement} container - 游戏容器元素
    */
@@ -928,7 +1431,29 @@ export class FerrisWheelGame {
    * 卸载游戏
    */
   async unmount() {
-    // TODO: Task #34 - 实现卸载逻辑
+    // 清除所有定时器和动画
+    this._clearPlayback();
+
+    // 保存进度
+    if (this._state && this._state.progress) {
+      this._saveProgress();
+    }
+
+    // 解绑所有事件监听器
+    this._eventListeners.forEach(({ element, type, handler }) => {
+      element.removeEventListener(type, handler);
+    });
+    this._eventListeners = [];
+
+    // 清空容器
+    if (this._container) {
+      this._container.innerHTML = '';
+    }
+
+    // 重置状态和 DOM 引用
+    this._state = null;
+    this._dom = null;
+    this._container = null;
 
     console.log('摩天轮游戏已卸载');
   }
