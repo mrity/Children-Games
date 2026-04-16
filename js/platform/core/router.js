@@ -28,6 +28,13 @@ export class GameRouter {
     window.addEventListener('hashchange', () => this.handleHashChange());
     window.addEventListener('popstate', () => this.handleHashChange());
 
+    // 不在这里处理初始路由，等待游戏注册完成后再处理
+  }
+
+  /**
+   * 启动路由（在游戏注册完成后调用）
+   */
+  start() {
     // 处理初始路由
     this.handleHashChange();
   }

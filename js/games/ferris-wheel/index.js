@@ -89,7 +89,7 @@ export class FerrisWheelGame {
     return `
       <!-- 导航栏 -->
       <nav class="nav-bar" role="navigation" aria-label="主导航">
-        <button class="nav-button" data-screen="home" aria-label="返回首页" tabindex="0">首页</button>
+        <button class="nav-button" id="back-to-platform" aria-label="返回平台首页" tabindex="0">← 返回平台</button>
         <button class="nav-button" data-screen="map" aria-label="查看地图" tabindex="0">地图</button>
         <button class="nav-button" data-screen="progress" aria-label="查看进度" tabindex="0">进度</button>
         <button class="nav-button" id="sound-toggle" aria-label="音效开关" aria-pressed="true" tabindex="0">🔊</button>
@@ -285,7 +285,8 @@ export class FerrisWheelGame {
     const c = this._container;
     this._dom = {
       // 导航栏
-      navButtons: c.querySelectorAll('.nav-button:not(#sound-toggle)'),
+      navButtons: c.querySelectorAll('.nav-button:not(#sound-toggle):not(#back-to-platform)'),
+      backToPlatformButton: c.querySelector('#back-to-platform'),
       soundToggle: c.querySelector('#sound-toggle'),
 
       // 地图页
@@ -359,6 +360,16 @@ export class FerrisWheelGame {
       button.addEventListener('click', handler);
       this._eventListeners.push({ element: button, type: 'click', handler });
     });
+
+    // 返回平台按钮
+    if (this._dom.backToPlatformButton) {
+      const backToPlatformHandler = () => {
+        // 通过修改 URL hash 返回平台首页
+        window.location.hash = '#/';
+      };
+      this._dom.backToPlatformButton.addEventListener('click', backToPlatformHandler);
+      this._eventListeners.push({ element: this._dom.backToPlatformButton, type: 'click', handler: backToPlatformHandler });
+    }
 
     // 答案按钮(事件委托)
     const answerGridHandler = (event) => {
@@ -469,7 +480,7 @@ export class FerrisWheelGame {
    */
   _initState() {
     this._state = {
-      currentScreen: 'map',
+      currentScreen: 'map', // 默认显示地图页，让用户选择关卡
       currentLevelId: null,
       scene: null,
       selectedAnswer: '',
@@ -1424,6 +1435,9 @@ export class FerrisWheelGame {
 
     // 初始渲染
     this._renderAll();
+
+    // 导航到默认页面（地图页）
+    this._navigateTo(this._state.currentScreen);
 
     console.log('摩天轮游戏已挂载');
   }

@@ -36,7 +36,7 @@ async function initPlatform() {
     return;
   }
 
-  // 5. 初始化路由系统
+  // 5. 初始化路由系统（不处理初始路由）
   router.init({
     homeContainer,
     gameContainer,
@@ -56,6 +56,10 @@ async function initPlatform() {
   // 6. 注册游戏（目前只有摩天轮游戏的占位符）
   registerGames();
   console.log('✓ 游戏已注册');
+
+  // 7. 启动路由（处理初始 URL）
+  router.start();
+  console.log('✓ 路由已启动');
 
   // 7. 渲染首页
   renderHomePage();
