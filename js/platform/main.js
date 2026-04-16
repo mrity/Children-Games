@@ -1,0 +1,166 @@
+/**
+ * 平台主入口
+ * 初始化多游戏集合平台
+ */
+
+import { router } from './core/router.js';
+import { storageSystem } from './core/storage.js';
+import SoundManager from './core/sound.js';
+import { renderHome, addHomeStyles } from './ui/home.js';
+
+/**
+ * 初始化平台
+ */
+async function initPlatform() {
+  console.log('初始化 Logic Park 平台...');
+
+  // 1. 初始化存储系统
+  storageSystem.init();
+  console.log('✓ 存储系统已初始化');
+
+  // 2. 初始化音效系统
+  SoundManager.init();
+  console.log('✓ 音效系统已初始化');
+
+  // 3. 添加首页样式
+  addHomeStyles();
+  console.log('✓ 首页样式已加载');
+
+  // 4. 获取容器元素
+  const homeContainer = document.getElementById('home-container');
+  const gameContainer = document.getElementById('game-container');
+
+  if (!homeContainer || !gameContainer) {
+    console.error('未找到必需的容器元素');
+    return;
+  }
+
+  // 5. 初始化路由系统
+  router.init({
+    homeContainer,
+    gameContainer,
+    onRouteChange: (route) => {
+      console.log('路由变化:', route);
+
+      // 更新页面标题
+      if (route.type === 'home') {
+        document.title = 'Logic Park - 儿童益智游戏集合';
+      } else if (route.type === 'game' && route.game) {
+        document.title = `${route.game.name} - Logic Park`;
+      }
+    }
+  });
+  console.log('✓ 路由系统已初始化');
+
+  // 6. 注册游戏（目前只有摩天轮游戏的占位符）
+  registerGames();
+  console.log('✓ 游戏已注册');
+
+  // 7. 渲染首页
+  renderHomePage();
+  console.log('✓ 首页已渲染');
+
+  console.log('🎉 Logic Park 平台初始化完成！');
+}
+
+/**
+ * 注册所有游戏
+ */
+function registerGames() {
+  // 摩天轮游戏配置（占位符）
+  const ferrisWheelGame = {
+    id: 'ferris-wheel',
+    name: '摩天轮乐园',
+    description: '跟着小动物坐摩天轮，学会顺序观察和位置推理',
+    icon: '🎡',
+    category: 'logic',
+    ageRange: '5-8岁',
+    difficulty: 'easy',
+
+    // 游戏挂载方法（临时实现）
+    async mount(container) {
+      container.innerHTML = `
+        <div style="padding: 2rem; text-align: center;">
+          <h2>🎡 摩天轮乐园</h2>
+          <p>游戏正在迁移中...</p>
+          <p style="color: #666; margin-top: 1rem;">
+            阶段 2 将完成摩天轮游戏的完整迁移
+          </p>
+          <button onclick="window.location.hash='#/'" style="
+            margin-top: 2rem;
+            padding: 0.75rem 1.5rem;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+          ">返回首页</button>
+        </div>
+      `;
+    },
+
+    // 游戏卸载方法
+    async unmount() {
+      console.log('摩天轮游戏已卸载');
+    }
+  };
+
+  // 注册摩天轮游戏
+  router.register(ferrisWheelGame);
+
+  // 未来的游戏占位符
+  const comingSoonGames = [
+    {
+      id: 'puzzle',
+      name: '拼图挑战',
+      description: '锻炼空间想象和图形组合能力',
+      icon: '🧩',
+      category: 'puzzle',
+      ageRange: '6-10岁',
+      difficulty: 'medium',
+      mount: async (container) => {
+        container.innerHTML = '<div style="padding: 2rem; text-align: center;"><h2>🧩 拼图挑战</h2><p>敬请期待...</p></div>';
+      },
+      unmount: async () => {}
+    },
+    {
+      id: 'memory',
+      name: '记忆翻牌',
+      description: '提升记忆力和专注力',
+      icon: '🃏',
+      category: 'memory',
+      ageRange: '5-9岁',
+      difficulty: 'easy',
+      mount: async (container) => {
+        container.innerHTML = '<div style="padding: 2rem; text-align: center;"><h2>🃏 记忆翻牌</h2><p>敬请期待...</p></div>';
+      },
+      unmount: async () => {}
+    }
+  ];
+
+  // 注册占位符游戏
+  comingSoonGames.forEach(game => router.register(game));
+}
+
+/**
+ * 渲染首页
+ */
+function renderHomePage() {
+  const homeContainer = document.getElementById('home-container');
+  const games = router.getAllGames();
+
+  renderHome(homeContainer, games, (gameId) => {
+    router.navigateTo(gameId);
+  });
+}
+
+// 页面加载完成后初始化平台
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initPlatform);
+} else {
+  initPlatform();
+}
+
+// 导出供外部使用
+export { router, storageSystem, SoundManager };

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Logic Park - 儿童益智游戏集合</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="css/sound.css">
+</head>
+<body>
+  <div class="page-shell">
+    <!-- 全局导航栏 -->
+    <header class="topbar">
+      <div class="brand-block">
+        <p class="brand-kicker">Logic Park</p>
+        <h1 id="platform-title">儿童益智游戏集合</h1>
+      </div>
+      <button class="sound-toggle" id="sound-toggle" aria-label="音效开关" title="音效开关" tabindex="0">
+        <span class="sound-icon">🔊</span>
+      </button>
+    </header>
+
+    <main>
+      <!-- 首页容器 -->
+      <div id="home-container" style="display: block;"></div>
+
+      <!-- 游戏容器 -->
+      <div id="game-container" style="display: none;"></div>
+    </main>
+  </div>
+
+  <!-- 加载平台主入口 -->
+  <script type="module" src="js/platform/main.js"></script>
+</body>
+</html>
