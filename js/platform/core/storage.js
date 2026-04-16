@@ -456,6 +456,17 @@ export function getUnlockedLevelCount(progress, totalLevels) {
   return Math.min(totalLevels, progress.completedLevelIds.length + 1);
 }
 
+/**
+ * 判断关卡是否已解锁
+ * @param {Object} progress - 进度对象
+ * @param {number} levelNumber - 关卡编号（从1开始）
+ * @param {number} totalLevels - 总关卡数
+ * @returns {boolean} 是否已解锁
+ */
+export function isLevelUnlocked(progress, levelNumber, totalLevels) {
+  return levelNumber <= getUnlockedLevelCount(progress, totalLevels);
+}
+
 // ========== 浏览器兼容性检查 ==========
 
 /**

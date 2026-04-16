@@ -12,11 +12,12 @@ import {
   getLevelRecord,
   getBestStars,
   isLevelComplete,
+  isLevelUnlocked,
   getUnlockedLevelCount,
   checkBrowserCompatibility
 } from '../../platform/core/storage.js';
 
-import { SoundManager } from '../../platform/core/sound.js';
+import SoundManager from '../../platform/core/sound.js';
 
 // ========== 游戏核心模块导入 ==========
 import {
