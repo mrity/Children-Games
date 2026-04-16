@@ -1,0 +1,201 @@
+{
+  "version": 1,
+  "baseWheel": ["兔子", "青蛙", "小熊", "小松鼠", "狐狸", "熊猫", "小猴子", "小浣熊"],
+  "queueAnimals": ["小老鼠", "小狗", "小猪"],
+  "sameHeightSlots": {
+    "1": 7,
+    "2": 6,
+    "3": 5,
+    "5": 3,
+    "6": 2,
+    "7": 1
+  },
+  "zones": [
+    {
+      "id": "observe",
+      "name": "观察小舞台",
+      "subtitle": "先认识位置、上下左右和谁跟谁一样高。",
+      "band": "认识摩天轮的座位",
+      "color": "rgba(241, 184, 75, 0.2)"
+    },
+    {
+      "id": "rotate",
+      "name": "摩天轮乐园",
+      "subtitle": "学会顺时针转动后的位置变化和同高关系。",
+      "band": "看一看转了几格",
+      "color": "rgba(77, 176, 164, 0.2)"
+    },
+    {
+      "id": "queue",
+      "name": "排队小广场",
+      "subtitle": "排队的小动物也会加入摩天轮,一起来找位置。",
+      "band": "排队上车也要会推理",
+      "color": "rgba(245, 127, 141, 0.18)"
+    }
+  ],
+  "queueOrders": {
+    "A": ["小老鼠", "小狗", "小猪"],
+    "B": ["小狗", "小猪", "小老鼠"],
+    "C": ["小猪", "小老鼠", "小狗"],
+    "D": ["小老鼠", "小猪", "小狗"],
+    "E": ["小狗", "小老鼠", "小猪"]
+  },
+  "questionTypes": [
+    {
+      "id": "T1",
+      "zoneId": "observe",
+      "title": "先学会看位置",
+      "summary": "找顺时针下一格",
+      "questions": [
+        {"animal": "兔子"},
+        {"animal": "青蛙"},
+        {"animal": "小熊"},
+        {"animal": "熊猫"},
+        {"animal": "小浣熊"}
+      ]
+    },
+    {
+      "id": "T2",
+      "zoneId": "observe",
+      "title": "找同样高的小伙伴",
+      "summary": "看谁和谁一样高",
+      "questions": [
+        {"animal": "青蛙"},
+        {"animal": "小熊"},
+        {"animal": "小松鼠"},
+        {"animal": "熊猫"},
+        {"animal": "小猴子"}
+      ]
+    },
+    {
+      "id": "T3",
+      "zoneId": "observe",
+      "title": "认识最高的位置",
+      "summary": "看最上面的位置",
+      "questions": [
+        {"steps": 0},
+        {"steps": 1},
+        {"steps": 2},
+        {"steps": 3},
+        {"steps": 4}
+      ]
+    },
+    {
+      "id": "T4",
+      "zoneId": "observe",
+      "title": "认识前后位置",
+      "summary": "找逆时针前一格",
+      "questions": [
+        {"animal": "熊猫"},
+        {"animal": "小猴子"},
+        {"animal": "小浣熊"},
+        {"animal": "狐狸"},
+        {"animal": "小松鼠"}
+      ]
+    },
+    {
+      "id": "T5",
+      "zoneId": "rotate",
+      "title": "转到指定位置",
+      "summary": "转到目标后再找同高",
+      "questions": [
+        {"movingAnimal": "狐狸", "targetAnimal": "小猴子", "sameHeightAnimal": "小松鼠"},
+        {"movingAnimal": "兔子", "targetAnimal": "小熊", "sameHeightAnimal": "熊猫"},
+        {"movingAnimal": "小松鼠", "targetAnimal": "狐狸", "sameHeightAnimal": "小猴子"},
+        {"movingAnimal": "熊猫", "targetAnimal": "小浣熊", "sameHeightAnimal": "青蛙"},
+        {"movingAnimal": "青蛙", "targetAnimal": "熊猫", "sameHeightAnimal": "小猴子"}
+      ]
+    },
+    {
+      "id": "T6",
+      "zoneId": "rotate",
+      "title": "转动后再找同高",
+      "summary": "换一组动物继续推理",
+      "questions": [
+        {"movingAnimal": "兔子", "targetAnimal": "狐狸", "sameHeightAnimal": "小松鼠"},
+        {"movingAnimal": "小猴子", "targetAnimal": "小熊", "sameHeightAnimal": "小松鼠"},
+        {"movingAnimal": "小浣熊", "targetAnimal": "小松鼠", "sameHeightAnimal": "小猴子"},
+        {"movingAnimal": "小熊", "targetAnimal": "小浣熊", "sameHeightAnimal": "熊猫"},
+        {"movingAnimal": "狐狸", "targetAnimal": "青蛙", "sameHeightAnimal": "小熊"}
+      ]
+    },
+    {
+      "id": "T7",
+      "zoneId": "rotate",
+      "title": "转几格看谁来",
+      "summary": "谁坐到某个原来的位置上",
+      "questions": [
+        {"animal": "兔子", "steps": 1},
+        {"animal": "青蛙", "steps": 2},
+        {"animal": "小熊", "steps": 3},
+        {"animal": "熊猫", "steps": 4},
+        {"animal": "小猴子", "steps": 5}
+      ]
+    },
+    {
+      "id": "T8",
+      "zoneId": "rotate",
+      "title": "转几格看终点",
+      "summary": "某只动物会到谁原来的位置",
+      "questions": [
+        {"animal": "小猴子", "steps": 3},
+        {"animal": "狐狸", "steps": 2},
+        {"animal": "熊猫", "steps": 4},
+        {"animal": "小浣熊", "steps": 1},
+        {"animal": "兔子", "steps": 6}
+      ]
+    },
+    {
+      "id": "T9",
+      "zoneId": "queue",
+      "title": "排队后看位置",
+      "summary": "目标动物到了以后再看别人的位置",
+      "questions": [
+        {"queueOrder": "A", "targetAnimal": "小老鼠", "targetOwner": "小熊", "watchAnimal": "小猪"},
+        {"queueOrder": "B", "targetAnimal": "小狗", "targetOwner": "兔子", "watchAnimal": "小老鼠"},
+        {"queueOrder": "C", "targetAnimal": "小老鼠", "targetOwner": "小猴子", "watchAnimal": "小狗"},
+        {"queueOrder": "D", "targetAnimal": "小狗", "targetOwner": "熊猫", "watchAnimal": "小老鼠"},
+        {"queueOrder": "E", "targetAnimal": "小猪", "targetOwner": "小熊", "watchAnimal": "小老鼠"}
+      ]
+    },
+    {
+      "id": "T10",
+      "zoneId": "queue",
+      "title": "谁先坐到底部",
+      "summary": "看刚上车时坐在哪个位置",
+      "questions": [
+        {"queueOrder": "A", "animal": "小老鼠"},
+        {"queueOrder": "A", "animal": "小狗"},
+        {"queueOrder": "A", "animal": "小猪"},
+        {"queueOrder": "B", "animal": "小老鼠"},
+        {"queueOrder": "C", "animal": "小老鼠"}
+      ]
+    },
+    {
+      "id": "T11",
+      "zoneId": "queue",
+      "title": "第二只小动物去哪儿",
+      "summary": "目标动物到位后再看另一只",
+      "questions": [
+        {"queueOrder": "A", "targetAnimal": "小老鼠", "targetOwner": "小熊", "watchAnimal": "小狗"},
+        {"queueOrder": "B", "targetAnimal": "小猪", "targetOwner": "兔子", "watchAnimal": "小狗"},
+        {"queueOrder": "C", "targetAnimal": "小狗", "targetOwner": "小猴子", "watchAnimal": "小猪"},
+        {"queueOrder": "D", "targetAnimal": "小猪", "targetOwner": "熊猫", "watchAnimal": "小狗"},
+        {"queueOrder": "E", "targetAnimal": "小老鼠", "targetOwner": "小猴子", "watchAnimal": "小猪"}
+      ]
+    },
+    {
+      "id": "T12",
+      "zoneId": "queue",
+      "title": "最上面的新朋友",
+      "summary": "目标动物到位后看最上面",
+      "questions": [
+        {"queueOrder": "A", "targetAnimal": "小老鼠", "targetOwner": "小熊"},
+        {"queueOrder": "B", "targetAnimal": "小狗", "targetOwner": "小猴子"},
+        {"queueOrder": "C", "targetAnimal": "小猪", "targetOwner": "熊猫"},
+        {"queueOrder": "D", "targetAnimal": "小狗", "targetOwner": "兔子"},
+        {"queueOrder": "B", "targetAnimal": "小老鼠", "targetOwner": "兔子"}
+      ]
+    }
+  ]
+}

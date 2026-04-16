@@ -80,7 +80,11 @@ button {
   border-radius: 999px;
   cursor: pointer;
   font: inherit;
+  min-height: 44px;
+  min-width: 44px;
   transition: transform 180ms ease, box-shadow 180ms ease, background-color 180ms ease, color 180ms ease;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 button:hover {
@@ -89,12 +93,23 @@ button:hover {
 
 button:active {
   transform: translateY(1px);
+  opacity: 0.8;
 }
 
 button:disabled {
   cursor: not-allowed;
   opacity: 0.58;
   transform: none;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  button:hover {
+    transform: none;
+  }
+
+  button:active {
+    transform: scale(0.96);
+  }
 }
 
 .page-shell {
@@ -1339,5 +1354,112 @@ main {
 
   .answer-grid {
     grid-template-columns: 1fr;
+  }
+
+  .answer-button,
+  .nav-chip,
+  .question-chip,
+  .queue-animal {
+    min-height: 48px;
+  }
+
+  .primary-button,
+  .secondary-button,
+  .ghost-button {
+    min-height: 48px;
+    padding: 16px 24px;
+  }
+}
+
+@media (max-width: 640px) and (orientation: landscape) {
+  body.is-game-screen #screen-game {
+    height: calc(100vh - 80px);
+  }
+
+  body.is-game-screen #screen-game .game-layout {
+    height: calc(100vh - 140px);
+    grid-template-columns: 1.2fr 0.8fr;
+    gap: 16px;
+  }
+
+  .wheel-body {
+    width: 300px;
+    height: 300px;
+    margin-left: -150px;
+  }
+
+  .wheel-spoke {
+    height: 95px;
+    margin-top: -95px;
+    transform-origin: center 95px;
+  }
+
+  .animal-cabin {
+    width: 56px;
+    height: 56px;
+  }
+
+  .animal-avatar {
+    font-size: 1.1rem;
+  }
+
+  .animal-name {
+    font-size: 0.5rem;
+  }
+
+  .scene-card {
+    padding: 12px;
+  }
+
+  .challenge-card,
+  .mini-progress-card {
+    padding: 14px;
+  }
+
+  .coach-panel {
+    flex-direction: row;
+    gap: 8px;
+  }
+
+  #coach-bubble {
+    padding: 12px 14px;
+    font-size: 0.9rem;
+  }
+
+  .challenge-prompt {
+    font-size: 1.05rem;
+  }
+
+  .answer-grid {
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .answer-button {
+    min-height: 52px;
+    padding: 10px 12px;
+    font-size: 1rem;
+  }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .animal-cabin,
+  .queue-animal,
+  .answer-button,
+  .question-chip,
+  .level-button {
+    transition: transform 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
+  }
+
+  .animal-cabin:active {
+    transform: translate(-50%, -50%) translate(var(--slot-x), var(--slot-y)) scale(0.95);
+  }
+
+  .queue-animal:active {
+    transform: scale(0.95);
   }
 }

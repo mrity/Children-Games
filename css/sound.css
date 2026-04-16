@@ -1,0 +1,65 @@
+/* ========== 音效控制按钮样式 ========== */
+
+.topbar {
+  position: relative;
+}
+
+.sound-toggle {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(31, 42, 56, 0.1);
+  z-index: 10;
+}
+
+.sound-toggle:hover {
+  background: rgba(255, 255, 255, 1);
+  box-shadow: 0 4px 12px rgba(31, 42, 56, 0.15);
+  transform: translateY(-50%) scale(1.05);
+}
+
+.sound-toggle:active {
+  transform: translateY(-50%) scale(0.95);
+}
+
+.sound-toggle.is-muted .sound-icon {
+  position: relative;
+}
+
+.sound-toggle.is-muted .sound-icon::after {
+  content: '🔇';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sound-toggle.is-muted .sound-icon::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+}
+
+@media (max-width: 768px) {
+  .sound-toggle {
+    width: 40px;
+    height: 40px;
+    font-size: 1.3rem;
+    right: 12px;
+  }
+}

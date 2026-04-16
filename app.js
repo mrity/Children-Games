@@ -9,6 +9,61 @@ const ROTATION_STEP_INTERVAL_MS = 80;
 const WHEEL_SLOT_COUNT = 8;
 const BOTTOM_SLOT_INDEX = 4;
 
+// Storage fallback system
+const storageSystem = {
+  type: "unknown",
+  memoryStore: {},
+
+  init() {
+    if (this.testLocalStorage()) {
+      this.type = "localStorage";
+    } else {
+      this.type = "memory";
+      console.warn("localStorage 不可用，使用内存存储作为降级方案。刷新页面后进度将丢失。");
+    }
+  },
+
+  testLocalStorage() {
+    try {
+      const testKey = "__storage_test__";
+      window.localStorage.setItem(testKey, "test");
+      window.localStorage.removeItem(testKey);
+      return true;
+    } catch (error) {
+      return false;
+    }
+  },
+
+  getItem(key) {
+    if (this.type === "localStorage") {
+      try {
+        return window.localStorage.getItem(key);
+      } catch (error) {
+        console.error("读取 localStorage 失败，切换到内存存储:", error);
+        this.type = "memory";
+        return this.memoryStore[key] || null;
+      }
+    }
+    return this.memoryStore[key] || null;
+  },
+
+  setItem(key, value) {
+    if (this.type === "localStorage") {
+      try {
+        window.localStorage.setItem(key, value);
+        return true;
+      } catch (error) {
+        console.error("写入 localStorage 失败，切换到内存存储:", error);
+        this.type = "memory";
+        this.memoryStore[key] = value;
+        return false;
+      }
+    }
+    this.memoryStore[key] = value;
+    return true;
+  }
+};
+
 const STARS_PERFECT = 3;
 const STARS_GOOD = 2;
 const STARS_PASS = 1;
@@ -87,7 +142,126 @@ const state = {
   progress: createEmptyProgress()
 };
 
+// ========== 音效系统 ==========
+const SoundManager = {
+  enabled: true,
+  sounds: {},
+  volume: 0.5,
+
+  init() {
+    const savedEnabled = storageSystem.getItem("sound-enabled");
+    if (savedEnabled !== null) {
+      this.enabled = savedEnabled === "true";
+    }
+    const savedVolume = storageSystem.getItem("sound-volume");
+    if (savedVolume !== null) {
+      this.volume = parseFloat(savedVolume);
+    }
+  },
+
+  play(soundName) {
+    if (!this.enabled) return;
+    try {
+      const method = `create${soundName.charAt(0).toUpperCase() + soundName.slice(1)}Sound`;
+      if (this[method]) {
+        this[method]();
+      }
+    } catch (error) {
+      console.warn(`播放音效失败: ${soundName}`, error);
+    }
+  },
+
+  createCorrectSound() {
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(523.25, audioContext.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(783.99, audioContext.currentTime + 0.1);
+    oscillator.frequency.exponentialRampToValueAtTime(1046.5, audioContext.currentTime + 0.2);
+    gainNode.gain.setValueAtTime(this.volume * 0.3, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.3);
+  },
+
+  createWrongSound() {
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(392, audioContext.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(261.63, audioContext.currentTime + 0.15);
+    gainNode.gain.setValueAtTime(this.volume * 0.3, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.2);
+  },
+
+  createRotateSound() {
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(220, audioContext.currentTime);
+    oscillator.frequency.linearRampToValueAtTime(440, audioContext.currentTime + 0.3);
+    oscillator.frequency.linearRampToValueAtTime(220, audioContext.currentTime + 0.6);
+    gainNode.gain.setValueAtTime(this.volume * 0.15, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.6);
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.6);
+  },
+
+  createClickSound() {
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+    gainNode.gain.setValueAtTime(this.volume * 0.2, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.05);
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.05);
+  },
+
+  createHintSound() {
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(659.25, audioContext.currentTime);
+    gainNode.gain.setValueAtTime(this.volume * 0.25, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.2);
+  },
+
+  toggle() {
+    this.enabled = !this.enabled;
+    storageSystem.setItem("sound-enabled", String(this.enabled));
+    return this.enabled;
+  },
+
+  setVolume(volume) {
+    this.volume = Math.max(0, Math.min(1, volume));
+    storageSystem.setItem("sound-volume", String(this.volume));
+  }
+};
+
 document.addEventListener("DOMContentLoaded", () => {
+  storageSystem.init();
+  SoundManager.init();
+  checkBrowserCompatibility();
   state.progress = loadProgress();
   cacheDom();
   renderWheelSpokes();
@@ -145,6 +319,7 @@ function cacheDom() {
   dom.exportProgressButton = document.querySelector("#export-progress-button");
   dom.importProgressButton = document.querySelector("#import-progress-button");
   dom.importProgressFile = document.querySelector("#import-progress-file");
+  dom.soundToggle = document.querySelector("#sound-toggle");
 }
 
 function bindEvents() {
@@ -192,6 +367,14 @@ function bindEvents() {
     }
   });
 
+  // 音效控制按钮
+  dom.soundToggle.addEventListener("click", () => {
+    const enabled = SoundManager.toggle();
+    dom.soundToggle.classList.toggle("is-muted", !enabled);
+    dom.soundToggle.setAttribute("aria-label", enabled ? "音效已开启" : "音效已关闭");
+    SoundManager.play("click");
+  });
+
   window.addEventListener("resize", () => {
     if (state.currentScreen === "game") {
       renderScene();
@@ -199,6 +382,10 @@ function bindEvents() {
   });
 }
 
+/**
+ * 重新渲染所有页面内容
+ * @returns {void}
+ */
 function renderAll() {
   renderNav();
   renderMap();
@@ -206,6 +393,10 @@ function renderAll() {
   renderProgress();
 }
 
+/**
+ * 渲染顶部导航栏，更新激活状态
+ * @returns {void}
+ */
 function renderNav() {
   dom.navButtons.forEach((button) => {
     const isActive = button.dataset.nav === state.currentScreen;
@@ -213,6 +404,11 @@ function renderNav() {
   });
 }
 
+/**
+ * 导航到指定屏幕
+ * @param {string} screenName - 屏幕名称，如 "home"、"map"、"game"、"progress"
+ * @returns {void}
+ */
 function navigateTo(screenName) {
   if (screenName !== "game") {
     clearPlayback();
@@ -238,6 +434,10 @@ function navigateTo(screenName) {
   }
 }
 
+/**
+ * 渲染乐园地图页面，包括所有区域和关卡
+ * @returns {void}
+ */
 function renderMap() {
   const completed = state.progress.completedLevelIds.length;
   const totalStars = LEVELS.reduce((sum, level) => sum + getBestStars(level.id), 0);
@@ -323,6 +523,10 @@ function renderQuestionChip(level) {
   `;
 }
 
+/**
+ * 渲染游戏页面
+ * @returns {void}
+ */
 function renderGame() {
   const level = currentLevel();
   if (!level) {
@@ -356,6 +560,14 @@ function renderAnswers() {
   setAnswerButtonsDisabled(state.isAutoAdvancing);
 }
 
+/**
+ * 渲染摩天轮场景，包括座舱和排队区
+ * @returns {void}
+ */
+/**
+ * 渲染摩天轮场景（座舱和排队区）
+ * @returns {void}
+ */
 function renderScene() {
   if (!state.scene) {
     return;
@@ -476,6 +688,11 @@ function progressCardHtml(label, value) {
   return `<div class="progress-card"><strong>${value}</strong><p>${label}</p></div>`;
 }
 
+/**
+ * 开始指定关卡
+ * @param {string} levelId - 关卡ID
+ * @returns {void}
+ */
 function startLevel(levelId) {
   hideResultOverlay();
   state.currentLevelId = levelId;
@@ -508,10 +725,19 @@ function resetCurrentLevelScene() {
   renderScene();
 }
 
+/**
+ * 获取当前关卡对象
+ * @returns {Object|null} 关卡对象，如果未找到返回 null
+ */
 function currentLevel() {
   return levelById(state.currentLevelId);
 }
 
+/**
+ * 根据关卡ID获取关卡对象
+ * @param {string} levelId - 关卡ID，格式如 "T1-Q1"
+ * @returns {Object|undefined} 关卡对象，如果未找到则返回 undefined
+ */
 function levelById(levelId) {
   return LEVELS.find((level) => level.id === levelId);
 }
@@ -520,6 +746,11 @@ function levelsByType(typeId) {
   return LEVELS.filter((level) => level.typeId === typeId);
 }
 
+/**
+ * 为指定关卡创建初始场景
+ * @param {Object} level - 关卡对象
+ * @returns {Object} 场景对象，包含摩天轮状态、排队队列、已上车动物和转动次数
+ */
 function createSceneForLevel(level) {
   const scene = {
     wheel: [...BASE_WHEEL],
@@ -549,6 +780,22 @@ function createEmptyProgress() {
   };
 }
 
+function checkBrowserCompatibility() {
+  const warnings = [];
+
+  if (typeof window.requestAnimationFrame !== "function") {
+    warnings.push("浏览器不支持动画 API，动画效果可能不流畅");
+  }
+
+  if (storageSystem.type === "memory") {
+    warnings.push("浏览器存储不可用，刷新页面后进度将丢失");
+  }
+
+  if (warnings.length > 0) {
+    console.warn("浏览器兼容性警告:", warnings.join("; "));
+  }
+}
+
 function normalizeProgress(parsed) {
   const fallback = createEmptyProgress();
 
@@ -557,13 +804,18 @@ function normalizeProgress(parsed) {
   }
 
   if (Array.isArray(parsed.completedLevelIds)) {
-    return {
-      ...fallback,
-      ...parsed,
-      stats: { ...fallback.stats, ...parsed.stats },
-      starsByLevel: { ...fallback.starsByLevel, ...parsed.starsByLevel },
-      recordsByLevel: { ...fallback.recordsByLevel, ...parsed.recordsByLevel }
-    };
+    try {
+      return {
+        ...fallback,
+        ...parsed,
+        stats: { ...fallback.stats, ...parsed.stats },
+        starsByLevel: { ...fallback.starsByLevel, ...parsed.starsByLevel },
+        recordsByLevel: { ...fallback.recordsByLevel, ...parsed.recordsByLevel }
+      };
+    } catch (error) {
+      console.error("进度数据格式错误，使用默认值:", error);
+      return fallback;
+    }
   }
 
   const legacyIds = LEVELS.map((level) => level.id).filter((id) => parsed[id] && typeof parsed[id] === "object");
@@ -573,37 +825,58 @@ function normalizeProgress(parsed) {
 
   const migrated = createEmptyProgress();
   legacyIds.forEach((id) => {
-    const item = parsed[id];
-    if (item.completed) {
-      migrated.completedLevelIds.push(id);
+    try {
+      const item = parsed[id];
+      if (item.completed) {
+        migrated.completedLevelIds.push(id);
+      }
+      migrated.starsByLevel[id] = Number(item.stars) || 0;
+      migrated.recordsByLevel[id] = {
+        attempts: Number(item.wrongAttempts || 0) + (item.completed ? 1 : 0),
+        hintsUsed: Number(item.hintsShown) || 0,
+        solutionViewed: Boolean(item.solutionViewed),
+        lastPlayedAt: ""
+      };
+      migrated.stats.hintsUsed += Number(item.hintsShown) || 0;
+      migrated.stats.solutionsViewed += item.solutionViewed ? 1 : 0;
+    } catch (error) {
+      console.error(`迁移关卡 ${id} 数据失败:`, error);
     }
-    migrated.starsByLevel[id] = Number(item.stars) || 0;
-    migrated.recordsByLevel[id] = {
-      attempts: Number(item.wrongAttempts || 0) + (item.completed ? 1 : 0),
-      hintsUsed: Number(item.hintsShown) || 0,
-      solutionViewed: Boolean(item.solutionViewed),
-      lastPlayedAt: ""
-    };
-    migrated.stats.hintsUsed += Number(item.hintsShown) || 0;
-    migrated.stats.solutionsViewed += item.solutionViewed ? 1 : 0;
   });
   return migrated;
 }
 
+/**
+ * 从存储系统加载游戏进度
+ * @returns {Object} 进度对象，包含已完成关卡、星星数、统计数据等
+ */
 function loadProgress() {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = storageSystem.getItem(STORAGE_KEY);
     if (!raw) {
       return createEmptyProgress();
     }
-    return normalizeProgress(JSON.parse(raw));
+    const parsed = JSON.parse(raw);
+    return normalizeProgress(parsed);
   } catch (error) {
+    console.error("加载进度失败，使用默认进度:", error);
     return createEmptyProgress();
   }
 }
 
+/**
+ * 保存当前游戏进度到存储系统
+ * @returns {void}
+ */
 function saveProgress() {
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state.progress));
+  try {
+    const success = storageSystem.setItem(STORAGE_KEY, JSON.stringify(state.progress));
+    if (!success && storageSystem.type === "memory") {
+      console.warn("进度已保存到内存，刷新页面后将丢失");
+    }
+  } catch (error) {
+    console.error("保存进度失败:", error);
+  }
 }
 
 function exportProgress() {
@@ -629,20 +902,79 @@ function exportProgress() {
   }
 }
 
+function validateProgressData(data) {
+  const errors = [];
+  const warnings = [];
+
+  if (!data || typeof data !== "object") {
+    errors.push("数据格式无效");
+    return { valid: false, errors, warnings, repaired: null };
+  }
+
+  const repaired = { ...data };
+
+  if (!Array.isArray(repaired.completedLevelIds)) {
+    warnings.push("已完成关卡列表缺失，已修复");
+    repaired.completedLevelIds = [];
+  } else {
+    const validIds = repaired.completedLevelIds.filter((id) => LEVELS.some((level) => level.id === id));
+    if (validIds.length !== repaired.completedLevelIds.length) {
+      warnings.push(`移除了 ${repaired.completedLevelIds.length - validIds.length} 个无效关卡ID`);
+      repaired.completedLevelIds = validIds;
+    }
+  }
+
+  if (!repaired.starsByLevel || typeof repaired.starsByLevel !== "object") {
+    warnings.push("星星记录缺失，已修复");
+    repaired.starsByLevel = {};
+  }
+
+  if (!repaired.stats || typeof repaired.stats !== "object") {
+    warnings.push("统计数据缺失，已修复");
+    repaired.stats = { hintsUsed: 0, solutionsViewed: 0, totalAttempts: 0 };
+  }
+
+  if (!repaired.recordsByLevel || typeof repaired.recordsByLevel !== "object") {
+    warnings.push("关卡记录缺失，已修复");
+    repaired.recordsByLevel = {};
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    warnings,
+    repaired
+  };
+}
+
 function importProgress(file) {
   const reader = new FileReader();
 
   reader.onload = (event) => {
     try {
       const imported = JSON.parse(event.target.result);
+
       if (!imported.data) {
         throw new Error("导入文件中没有找到进度数据。");
       }
 
-      const normalized = normalizeProgress(imported.data);
-      const confirmed = window.confirm(
-        `确定要导入进度吗？\n\n导出时间：${imported.exportDate ? new Date(imported.exportDate).toLocaleString() : "未知"}\n已完成关卡：${normalized.completedLevelIds.length} / ${LEVELS.length}\n\n当前进度会被覆盖。`
-      );
+      const validation = validateProgressData(imported.data);
+
+      if (!validation.valid) {
+        throw new Error(`数据验证失败：${validation.errors.join(", ")}`);
+      }
+
+      const normalized = normalizeProgress(validation.repaired);
+
+      let confirmMessage = `确定要导入进度吗？\n\n导出时间：${imported.exportDate ? new Date(imported.exportDate).toLocaleString() : "未知"}\n已完成关卡：${normalized.completedLevelIds.length} / ${LEVELS.length}`;
+
+      if (validation.warnings.length > 0) {
+        confirmMessage += `\n\n数据修复：\n${validation.warnings.join("\n")}`;
+      }
+
+      confirmMessage += "\n\n当前进度会被覆盖。";
+
+      const confirmed = window.confirm(confirmMessage);
 
       if (!confirmed) {
         dom.importProgressFile.value = "";
@@ -653,15 +985,22 @@ function importProgress(file) {
       saveProgress();
       renderAll();
       dom.importProgressFile.value = "";
-      alert("进度导入成功。");
+
+      const successMessage = validation.warnings.length > 0
+        ? `进度导入成功。已自动修复 ${validation.warnings.length} 个问题。`
+        : "进度导入成功。";
+
+      alert(successMessage);
     } catch (error) {
+      console.error("导入进度失败:", error);
       alert(`导入失败：${error.message}`);
       dom.importProgressFile.value = "";
     }
   };
 
   reader.onerror = () => {
-    alert("读取文件失败。");
+    console.error("读取文件失败");
+    alert("读取文件失败，请检查文件是否损坏。");
     dom.importProgressFile.value = "";
   };
 
@@ -696,6 +1035,10 @@ function isLevelUnlocked(levelNumber) {
   return levelNumber <= getUnlockedLevelCount();
 }
 
+/**
+ * 计算摩天轮各座位的布局坐标
+ * @returns {Array<{x: number, y: number}>} 座位坐标数组
+ */
 function getSlotLayout() {
   const size = dom.wheelBody.clientWidth || 380;
   const radius = size * 0.38;
@@ -708,10 +1051,21 @@ function getSlotLayout() {
   });
 }
 
+/**
+ * 获取动物在摩天轮上的位置索引
+ * @param {string} animal - 动物名称
+ * @returns {number} 位置索引（0-7），如果未找到返回 -1
+ */
 function animalSlot(animal) {
   return BASE_WHEEL.indexOf(animal);
 }
 
+/**
+ * 计算动物转到目标位置需要的步数
+ * @param {string} animal - 动物名称
+ * @param {number} targetSlot - 目标位置索引
+ * @returns {number} 需要转动的步数
+ */
 function rotationStepsForAnimalToSlot(animal, targetSlot) {
   const start = animalSlot(animal);
   return (targetSlot - start + WHEEL_SLOT_COUNT) % WHEEL_SLOT_COUNT;
@@ -797,6 +1151,14 @@ function buildChoiceSet(answer, pool) {
   return [...candidates.slice(rotateBy), ...candidates.slice(0, rotateBy)];
 }
 
+/**
+ * 推进场景，执行摩天轮转动
+ * @returns {void}
+ */
+/**
+ * 执行摩天轮转动
+ * @returns {void}
+ */
 function advanceScene() {
   if (state.isRotating || state.isPlayingSolution || state.isAutoAdvancing) {
     return;
@@ -823,6 +1185,7 @@ function advanceScene() {
   setMotionDisabled(true);
 
   const runOneStep = () => {
+    SoundManager.play("rotate");
     animateWheelTurn(direction, () => {
       applyRotationByDirection(level, direction);
       finishedSteps += 1;
@@ -840,6 +1203,14 @@ function advanceScene() {
   runOneStep();
 }
 
+/**
+ * 显示下一条提示信息
+ * @returns {void}
+ */
+/**
+ * 显示下一条提示
+ * @returns {void}
+ */
 function revealHint() {
   if (state.isAutoAdvancing) {
     return;
@@ -851,6 +1222,7 @@ function revealHint() {
     return;
   }
 
+  SoundManager.play("hint");
   state.hintsShown += 1;
   state.progress.stats.hintsUsed += 1;
   getLevelRecord(level.id).hintsUsed += 1;
@@ -859,6 +1231,16 @@ function revealHint() {
   setCoach("提示中", level.hints[state.hintsShown - 1]);
 }
 
+/**
+ * 提交用户选择的答案并处理答题结果
+ * @param {string} answer - 用户选择的答案
+ * @returns {void}
+ */
+/**
+ * 提交答案并处理结果
+ * @param {string} answer - 用户选择的答案
+ * @returns {void}
+ */
 function submitAnswer(answer) {
   if (state.isPlayingSolution || state.isRotating || state.isAutoAdvancing) {
     return;
@@ -884,6 +1266,7 @@ function submitAnswer(answer) {
   });
 
   if (answer === level.answer) {
+    SoundManager.play("correct");
     const stars = computeStars();
     finishLevel(level.id, stars);
     state.isAutoAdvancing = true;
@@ -894,6 +1277,7 @@ function submitAnswer(answer) {
     setAnswerButtonsDisabled(true);
     queueAutoAdvance();
   } else {
+    SoundManager.play("wrong");
     state.wrongAttempts += 1;
     hideAnswerStatusBadge();
     saveProgress();
@@ -902,6 +1286,14 @@ function submitAnswer(answer) {
   }
 }
 
+/**
+ * 播放当前关卡的解题步骤演示
+ * @returns {void}
+ */
+/**
+ * 播放分步讲解
+ * @returns {void}
+ */
 function playSolution() {
   if (state.isAutoAdvancing) {
     return;
@@ -982,6 +1374,14 @@ function finishLevel(levelId, stars) {
   renderAll();
 }
 
+/**
+ * 根据错误尝试次数计算获得的星星数
+ * @returns {number} 星星数量，3星（完美）、2星（良好）或1星（及格）
+ */
+/**
+ * 根据错误次数计算星级
+ * @returns {number} 星级（1-3）
+ */
 function computeStars() {
   if (state.wrongAttempts === 1) {
     return STARS_GOOD;
@@ -1278,6 +1678,12 @@ function setMotionDisabled(disabled) {
   dom.rotateNowButton.disabled = disabled;
 }
 
+/**
+ * 执行摩天轮转动动画
+ * @param {string} direction - 转动方向，"clockwise" 或 "counterclockwise"
+ * @param {Function} onFinish - 动画完成后的回调函数
+ * @returns {void}
+ */
 function animateWheelTurn(direction, onFinish) {
   const angle = direction === "counterclockwise" ? -45 : 45;
   let finished = false;

@@ -90,7 +90,12 @@
 
 - `index.html`：页面结构和主要界面
 - `style.css`：整体视觉样式和响应式布局
-- `app.js`：题库、动画、答题流程、进度系统
+- `app.js`：主程序文件（正在进行模块化拆分）
+- `js/`：模块化代码目录
+  - `core/`：核心模块（常量、状态、题库、音效、存储）
+  - `game/`：游戏逻辑模块（摩天轮逻辑、关卡管理等）
+  - `ui/`：UI 渲染模块
+  - `animation/`：动画模块
 - `pic.png`：原始题图
 - `question.md`：原始题目文字
 - `start-lan-server.cmd` / `start-lan-server.ps1`：启动局域网访问
@@ -147,9 +152,18 @@ https://mrity.github.io/Children-Games/
 
 - 无需安装 Node.js 依赖
 - 无需构建步骤
-- 所有题目数据都内置在 `app.js`
-- 学习进度保存在浏览器 `localStorage`
+- 使用 ES6 模块化架构，代码结构清晰
+- 题库数据模块化管理
+- 学习进度保存在浏览器 `localStorage`，支持降级到内存存储
 - 发布到 GitHub Pages 时不包含备份和恢复用的辅助文件
+
+### 最近更新（2026-04-16）
+
+- ✨ 实现代码模块化拆分，提升可维护性
+- ✨ 创建 `storage.js` 模块，实现 localStorage 降级方案
+- ✨ 创建 `wheel.js` 模块，封装摩天轮核心逻辑
+- 🔧 优化存储系统，增强错误处理
+- 📝 完善代码文档和注释
 
 ## 原始题目
 
