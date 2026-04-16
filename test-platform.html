@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>平台测试</title>
+  <style>
+    body { font-family: sans-serif; padding: 2rem; max-width: 800px; margin: 0 auto; }
+    .test-section { margin: 2rem 0; padding: 1rem; border: 1px solid #ddd; border-radius: 8px; }
+    .test-result { margin: 0.5rem 0; padding: 0.5rem; border-radius: 4px; }
+    .pass { background: #d4edda; color: #155724; }
+    .fail { background: #f8d7da; color: #721c24; }
+    button { padding: 0.5rem 1rem; margin: 0.5rem; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>Logic Park 平台测试</h1>
+  
+  <div class="test-section">
+    <h2>1. 模块加载测试</h2>
+    <div id="module-test"></div>
+  </div>
+
+  <div class="test-section">
+    <h2>2. 存储系统测试</h2>
+    <div id="storage-test"></div>
+    <button onclick="testStorage()">运行存储测试</button>
+  </div>
+
+  <div class="test-section">
+    <h2>3. 路由系统测试</h2>
+    <div id="router-test"></div>
+    <button onclick="testRouter()">运行路由测试</button>
+  </div>
+
+  <script type="module">
+    // 测试模块加载
+    const moduleTest = document.getElementById('module-test');
+    
+    try {
+      const { router } = await import('./js/platform/core/router.js');
+      const { storageSystem } = await import('./js/platform/core/storage.js');
+      
+      moduleTest.innerHTML = '<div class="test-result pass">✓ 所有模块加载成功</div>';
+      
+      // 暴露到全局供测试使用
+      window.testRouter = router;
+      window.testStorage = storageSystem;
+      
+    } catch (error) {
+      moduleTest.innerHTML = `<div class="test-result fail">✗ 模块加载失败: ${error.message}</div>`;
+      console.error(error);
+    }
+
+    // 存储系统测试
+    window.testStorage = function() {
+      const resultDiv = document.getElementById('storage-test');
+      const results = [];
+      
+      try {
+        // 初始化存储
+        window.testStorage.init();
+        results.push('✓ 存储系统初始化成功');
+        
+        // 测试写入
+        window.testStorage.setItem('test-key', 'test-value');
+        results.push('✓ 数据写入成功');
+        
+        // 测试读取
+        const value = window.testStorage.getItem('test-key');
+        if (value === 'test-value') {
+          results.push('✓ 数据读取成功');
+        } else {
+          results.push('✗ 数据读取失败');
+        }
+        
+        // 清理测试数据
+        localStorage.removeItem('test-key');
+        
+        resultDiv.innerHTML = results.map(r => 
+          `<div class="test-result ${r.startsWith('✓') ? 'pass' : 'fail'}">${r}</div>`
+        ).join('');
+        
+      } catch (error) {
+        resultDiv.innerHTML = `<div class="test-result fail">✗ 测试失败: ${error.message}</div>`;
+        console.error(error);
+      }
+    };
+
+    // 路由系统测试
+    window.testRouter = function() {
+      const resultDiv = document.getElementById('router-test');
+      const results = [];
+      
+      try {
+        // 测试路由解析
+        const homeRoute = window.testRouter.parseHash('#/');
+        if (homeRoute.type === 'home') {
+          results.push('✓ 首页路由解析正确');
+        }
+        
+        const gameRoute = window.testRouter.parseHash('#/games/ferris-wheel');
+        if (gameRoute.type === 'game' && gameRoute.gameId === 'ferris-wheel') {
+          results.push('✓ 游戏路由解析正确');
+        }
+        
+        // 测试游戏注册
+        const games = window.testRouter.getAllGames();
+        results.push(`✓ 已注册 ${games.length} 个游戏`);
+        
+        resultDiv.innerHTML = results.map(r => 
+          `<div class="test-result pass">${r}</div>`
+        ).join('');
+        
+      } catch (error) {
+        resultDiv.innerHTML = `<div class="test-result fail">✗ 测试失败: ${error.message}</div>`;
+        console.error(error);
+      }
+    };
+  </script>
+</body>
+</html>

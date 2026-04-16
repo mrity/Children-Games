@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>测试模块导入</title>
+</head>
+<body>
+  <h1>测试模块导入</h1>
+  <div id="output"></div>
+
+  <script type="module">
+    const output = document.getElementById('output');
+
+    try {
+      output.innerHTML += '<p>开始测试...</p>';
+
+      // 测试导入 main.js
+      import('./js/platform/main.js')
+        .then(() => {
+          output.innerHTML += '<p style="color: green;">✓ main.js 导入成功</p>';
+        })
+        .catch(error => {
+          output.innerHTML += `<p style="color: red;">✗ main.js 导入失败: ${error.message}</p>`;
+          console.error('导入错误:', error);
+        });
+    } catch (error) {
+      output.innerHTML += `<p style="color: red;">✗ 测试失败: ${error.message}</p>`;
+      console.error('测试错误:', error);
+    }
+  </script>
+</body>
+</html>
