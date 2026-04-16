@@ -7,6 +7,7 @@ import { router } from './core/router.js';
 import { storageSystem } from './core/storage.js';
 import SoundManager from './core/sound.js';
 import { renderHome, addHomeStyles } from './ui/home.js';
+import ferrisWheelConfig from '../games/ferris-wheel/config.js';
 
 /**
  * 初始化平台
@@ -67,47 +68,8 @@ async function initPlatform() {
  * 注册所有游戏
  */
 function registerGames() {
-  // 摩天轮游戏配置（占位符）
-  const ferrisWheelGame = {
-    id: 'ferris-wheel',
-    name: '摩天轮乐园',
-    description: '跟着小动物坐摩天轮，学会顺序观察和位置推理',
-    icon: '🎡',
-    category: 'logic',
-    ageRange: '5-8岁',
-    difficulty: 'easy',
-
-    // 游戏挂载方法（临时实现）
-    async mount(container) {
-      container.innerHTML = `
-        <div style="padding: 2rem; text-align: center;">
-          <h2>🎡 摩天轮乐园</h2>
-          <p>游戏正在迁移中...</p>
-          <p style="color: #666; margin-top: 1rem;">
-            阶段 2 将完成摩天轮游戏的完整迁移
-          </p>
-          <button onclick="window.location.hash='#/'" style="
-            margin-top: 2rem;
-            padding: 0.75rem 1.5rem;
-            background: #007bff;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 1rem;
-          ">返回首页</button>
-        </div>
-      `;
-    },
-
-    // 游戏卸载方法
-    async unmount() {
-      console.log('摩天轮游戏已卸载');
-    }
-  };
-
-  // 注册摩天轮游戏
-  router.register(ferrisWheelGame);
+  // 注册摩天轮游戏（真实实现）
+  router.register(ferrisWheelConfig);
 
   // 未来的游戏占位符
   const comingSoonGames = [
